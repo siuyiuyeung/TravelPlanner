@@ -46,7 +46,6 @@ export function AttachmentUpload({ tripId, itemId, onUploaded }: Props) {
         ref={inputRef}
         type="file"
         accept="image/jpeg,image/png,image/webp,image/heic,application/pdf"
-        capture="environment"
         className="hidden"
         onChange={handleChange}
       />
