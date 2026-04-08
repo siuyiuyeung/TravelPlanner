@@ -1,26 +1,113 @@
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
 @import "tailwindcss";
 
+/* ─── Design tokens ─────────────────────────────────────────────────────────── */
+
+@theme {
+  --font-sans: "Plus Jakarta Sans", ui-rounded, system-ui, -apple-system, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, monospace;
+
+  /* Brand */
+  --color-brand: #E8622A;
+  --color-brand-light: rgba(232, 98, 42, 0.12);
+  --color-ocean: #2D6A8F;
+  --color-gold: #F2A93B;
+
+  /* Backgrounds */
+  --color-bg-base: #FAF8F5;
+  --color-bg-surface: #FFFFFF;
+  --color-bg-sunken: #F0EDE8;
+
+  /* Text */
+  --color-ink: #1A1512;
+  --color-ink-2: #6B6560;
+  --color-ink-3: #A09B96;
+
+  /* Borders */
+  --color-border: #E5E0DA;
+  --color-border-strong: #C8C0B8;
+
+  /* Status */
+  --color-planning: #A78BFA;
+  --color-active: #3D9970;
+  --color-completed: #A09B96;
+
+  /* Semantic */
+  --color-success: #3D9970;
+  --color-error: #E84040;
+
+  /* Radii */
+  --radius-card: 16px;
+  --radius-btn: 12px;
+  --radius-input: 10px;
+  --radius-sheet: 24px;
+}
+
+/* ─── shadcn/ui CSS variable overrides ──────────────────────────────────────── */
+
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: 45 33% 98%;
+  --foreground: 20 14% 10%;
+  --card: 0 0% 100%;
+  --card-foreground: 20 14% 10%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 20 14% 10%;
+  --primary: 19 79% 54%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 205 52% 37%;
+  --secondary-foreground: 0 0% 100%;
+  --muted: 30 18% 92%;
+  --muted-foreground: 20 8% 42%;
+  --accent: 36 88% 59%;
+  --accent-foreground: 20 14% 10%;
+  --destructive: 0 72% 57%;
+  --destructive-foreground: 0 0% 100%;
+  --border: 30 18% 88%;
+  --input: 30 18% 92%;
+  --ring: 19 79% 54%;
+  --radius: 0.75rem;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
+/* ─── Base styles ────────────────────────────────────────────────────────────── */
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+html {
+  color-scheme: light;
+  -webkit-text-size-adjust: 100%;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background-color: var(--color-bg-base);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  overscroll-behavior: none;
+}
+
+/* ─── Mobile safe areas ──────────────────────────────────────────────────────── */
+
+.pb-safe {
+  padding-bottom: max(env(safe-area-inset-bottom), 16px);
+}
+
+/* ─── Scrollbar hide ─────────────────────────────────────────────────────────── */
+
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar { scrollbar-width: none; -ms-overflow-style: none; }
+
+/* ─── Tap highlight ──────────────────────────────────────────────────────────── */
+
+* { -webkit-tap-highlight-color: transparent; }
+
+/* ─── Input font size — prevent iOS zoom ─────────────────────────────────────── */
+
+input, textarea, select { font-size: 16px !important; }
+
+/* ─── Reduced motion ─────────────────────────────────────────────────────────── */
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
 }

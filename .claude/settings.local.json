@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(pnpm typecheck:*)",
+      "Bash(pnpm lint:*)",
+      "Bash(pnpm exec:*)",
+      "Bash(node_modules/.bin/tsx --env-file=.env scripts/migrate.ts)",
+      "Bash(node_modules/.bin/eslint src:*)",
+      "Bash(npx next:*)",
+      "Bash(node scripts/generate-icons.mjs)",
+      "Bash(ls c:/Users/IGS/VsCodeProjects/travel-planner/*.yml c:/Users/IGS/VsCodeProjects/travel-planner/Dockerfile*)"
+    ]
+  }
+}

@@ -1,0 +1,1615 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TravelPlanner — Design Preview</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --brand: #E8622A;
+    --brand-light: rgba(232,98,42,0.12);
+    --ocean: #2D6A8F;
+    --gold: #F2A93B;
+    --bg-base: #FAF8F5;
+    --bg-surface: #FFFFFF;
+    --bg-sunken: #F0EDE8;
+    --ink: #1A1512;
+    --ink-2: #6B6560;
+    --ink-3: #A09B96;
+    --border: #E5E0DA;
+    --border-strong: #C8C0B8;
+    --planning: #A78BFA;
+    --active: #3D9970;
+    --completed: #A09B96;
+    --r-card: 16px;
+    --r-btn: 12px;
+    --r-sheet: 24px;
+    --font: 'Plus Jakarta Sans', ui-rounded, system-ui, sans-serif;
+    --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: #EDE8E2;
+    font-family: var(--font);
+    min-height: 100vh;
+    padding: 48px 32px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0;
+  }
+
+  .page-header {
+    text-align: center;
+    margin-bottom: 40px;
+  }
+  .page-header h1 {
+    font-size: 28px;
+    font-weight: 700;
+    color: var(--ink);
+    letter-spacing: -0.02em;
+  }
+  .page-header p {
+    font-size: 14px;
+    color: var(--ink-2);
+    margin-top: 6px;
+  }
+
+  .frames-row {
+    display: flex;
+    gap: 32px;
+    align-items: flex-start;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+
+  .frame-wrapper {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 14px;
+  }
+  .frame-label {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--ink-2);
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+  }
+
+  /* iPhone bezel */
+  .iphone {
+    width: 390px;
+    height: 844px;
+    background: #1A1512;
+    border-radius: 52px;
+    padding: 12px;
+    box-shadow:
+      0 0 0 1px rgba(255,255,255,0.12),
+      0 30px 80px rgba(0,0,0,0.35),
+      0 8px 24px rgba(0,0,0,0.20),
+      inset 0 0 0 1px rgba(255,255,255,0.06);
+    position: relative;
+    flex-shrink: 0;
+  }
+
+  .iphone-screen {
+    width: 100%;
+    height: 100%;
+    border-radius: 42px;
+    overflow: hidden;
+    background: var(--bg-base);
+    position: relative;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* Dynamic island */
+  .dynamic-island {
+    position: absolute;
+    top: 12px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 120px;
+    height: 34px;
+    background: #1A1512;
+    border-radius: 20px;
+    z-index: 100;
+  }
+
+  /* Status bar */
+  .status-bar {
+    height: 54px;
+    padding: 14px 28px 0;
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    flex-shrink: 0;
+    position: relative;
+    z-index: 10;
+  }
+  .status-bar.dark { background: transparent; }
+  .status-bar .time {
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--ink);
+    letter-spacing: -0.01em;
+  }
+  .status-bar.over-hero .time { color: white; }
+  .status-icons {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .status-bar.over-hero .status-icons svg { stroke: white; fill: white; }
+
+  /* Scrollable content area */
+  .screen-content {
+    flex: 1;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* ============================
+     BOTTOM NAV
+  ============================ */
+  .bottom-nav {
+    height: 82px;
+    background: rgba(250,248,245,0.93);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border-top: 1px solid var(--border);
+    display: flex;
+    align-items: flex-start;
+    padding-top: 10px;
+    flex-shrink: 0;
+  }
+  .nav-item {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    cursor: pointer;
+  }
+  .nav-icon {
+    width: 26px;
+    height: 26px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+  }
+  .nav-dot {
+    width: 4px;
+    height: 4px;
+    border-radius: 50%;
+    background: var(--brand);
+    position: absolute;
+    bottom: -6px;
+    left: 50%;
+    transform: translateX(-50%);
+  }
+  .nav-label {
+    font-size: 10px;
+    font-weight: 500;
+    color: var(--ink-3);
+  }
+  .nav-item.active .nav-label { color: var(--brand); }
+
+  /* ============================
+     SCREEN 1 — DASHBOARD
+  ============================ */
+  .s1-scroll {
+    flex: 1;
+    overflow-y: auto;
+    padding: 8px 20px 20px;
+    scrollbar-width: none;
+  }
+  .s1-scroll::-webkit-scrollbar { display: none; }
+
+  .greeting {
+    margin-bottom: 24px;
+  }
+  .greeting h1 {
+    font-size: 26px;
+    font-weight: 700;
+    color: var(--ink);
+    letter-spacing: -0.02em;
+    line-height: 1.2;
+  }
+  .greeting p {
+    font-size: 14px;
+    color: var(--ink-2);
+    margin-top: 4px;
+  }
+
+  .section-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+  }
+  .section-title {
+    font-size: 17px;
+    font-weight: 700;
+    color: var(--ink);
+    letter-spacing: -0.01em;
+  }
+  .section-link {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--brand);
+  }
+
+  .trip-card {
+    border-radius: var(--r-card);
+    overflow: hidden;
+    margin-bottom: 14px;
+    box-shadow: 0 2px 8px rgba(26,21,18,0.08), 0 1px 2px rgba(26,21,18,0.04);
+  }
+  .trip-card-hero {
+    height: 120px;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    padding: 14px;
+  }
+  .trip-card-hero::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(to top, rgba(0,0,0,0.55) 0%, transparent 60%);
+  }
+  .tc-tokyo { background: linear-gradient(135deg, #1a1a3e 0%, #2d2060 40%, #4a1060 70%, #6b2080 100%); }
+  .tc-bali { background: linear-gradient(135deg, #c0392b 0%, #e67e22 40%, #f39c12 70%, #f1c40f 100%); }
+
+  .trip-card-hero-content {
+    position: relative;
+    z-index: 1;
+  }
+  .trip-name-hero {
+    font-size: 18px;
+    font-weight: 700;
+    color: white;
+    letter-spacing: -0.01em;
+  }
+  .trip-meta-hero {
+    font-size: 12px;
+    color: rgba(255,255,255,0.8);
+    margin-top: 2px;
+  }
+
+  .trip-card-body {
+    background: var(--bg-surface);
+    padding: 12px 14px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .trip-card-body-left { display: flex; flex-direction: column; gap: 4px; }
+  .group-tag {
+    font-size: 11px;
+    color: var(--ink-3);
+    font-weight: 500;
+  }
+  .status-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 3px 8px;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 600;
+  }
+  .status-badge.planning { background: rgba(167,139,250,0.15); color: var(--planning); }
+  .status-badge.active { background: rgba(61,153,112,0.15); color: var(--active); }
+  .status-badge.completed { background: rgba(160,155,150,0.15); color: var(--completed); }
+  .status-dot { width: 5px; height: 5px; border-radius: 50%; }
+  .status-badge.planning .status-dot { background: var(--planning); }
+  .status-badge.active .status-dot { background: var(--active); }
+  .status-badge.completed .status-dot { background: var(--completed); }
+
+  .avatar-stack {
+    display: flex;
+    align-items: center;
+  }
+  .avatar {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    border: 2px solid var(--bg-surface);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 10px;
+    font-weight: 700;
+    color: white;
+    margin-left: -8px;
+    flex-shrink: 0;
+  }
+  .avatar:first-child { margin-left: 0; }
+  .av-a { background: #E8622A; }
+  .av-b { background: #2D6A8F; }
+  .av-c { background: #3D9970; }
+  .av-d { background: #A78BFA; }
+  .av-e { background: #F2A93B; }
+  .av-more {
+    background: var(--bg-sunken);
+    color: var(--ink-3);
+    font-size: 9px;
+    font-weight: 600;
+  }
+
+  /* Small past trip card */
+  .past-trip-card {
+    background: var(--bg-surface);
+    border: 1px solid var(--border);
+    border-radius: var(--r-card);
+    padding: 12px 14px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    opacity: 0.75;
+  }
+  .past-trip-thumb {
+    width: 48px;
+    height: 48px;
+    border-radius: 10px;
+    background: linear-gradient(135deg, #2c3e50, #4a5568);
+    flex-shrink: 0;
+  }
+  .past-trip-info { flex: 1; }
+  .past-trip-name { font-size: 15px; font-weight: 600; color: var(--ink); }
+  .past-trip-meta { font-size: 12px; color: var(--ink-3); margin-top: 2px; }
+
+  /* ============================
+     SCREEN 2 — TRIP OVERVIEW
+  ============================ */
+  .trip-hero {
+    height: 240px;
+    background: linear-gradient(160deg, #0f0c29 0%, #302b63 40%, #24243e 70%, #1a0a2e 100%);
+    position: relative;
+    flex-shrink: 0;
+    overflow: hidden;
+  }
+  .trip-hero::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background:
+      radial-gradient(ellipse at 70% 40%, rgba(100,60,160,0.5) 0%, transparent 60%),
+      radial-gradient(ellipse at 30% 70%, rgba(232,98,42,0.2) 0%, transparent 50%);
+  }
+  /* Tokyo skyline silhouette */
+  .skyline {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 100px;
+    opacity: 0.3;
+  }
+  .trip-hero-nav {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    padding: 54px 20px 0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    z-index: 10;
+  }
+  .hero-icon-btn {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.15);
+    backdrop-filter: blur(8px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .trip-hero-content {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    padding: 0 20px 20px;
+    z-index: 10;
+    background: linear-gradient(to top, rgba(0,0,0,0.6) 0%, transparent 100%);
+  }
+  .trip-hero-name {
+    font-size: 28px;
+    font-weight: 700;
+    color: white;
+    letter-spacing: -0.02em;
+    line-height: 1.1;
+  }
+  .trip-hero-dates {
+    font-size: 13px;
+    color: rgba(255,255,255,0.75);
+    margin-top: 4px;
+  }
+
+  .overview-body {
+    flex: 1;
+    overflow-y: auto;
+    scrollbar-width: none;
+    padding: 16px 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+  .overview-body::-webkit-scrollbar { display: none; }
+
+  .members-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .members-label {
+    font-size: 13px;
+    color: var(--ink-2);
+    margin-left: 4px;
+  }
+
+  .next-up-card {
+    background: var(--bg-surface);
+    border-radius: var(--r-card);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--brand);
+    padding: 14px 14px 14px 16px;
+    box-shadow: 0 2px 8px rgba(26,21,18,0.05);
+  }
+  .next-up-label {
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--brand);
+    margin-bottom: 6px;
+  }
+  .next-up-title {
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--ink);
+  }
+  .next-up-sub {
+    font-size: 12px;
+    color: var(--ink-2);
+    margin-top: 3px;
+  }
+
+  .stats-row {
+    display: flex;
+    gap: 12px;
+  }
+  .stat-chip {
+    flex: 1;
+    background: var(--bg-surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 10px 12px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+  }
+  .stat-value {
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--ink);
+    letter-spacing: -0.02em;
+  }
+  .stat-label {
+    font-size: 10px;
+    color: var(--ink-3);
+    font-weight: 500;
+  }
+
+  .trip-tabs {
+    display: flex;
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+    background: var(--bg-surface);
+    padding: 0 20px;
+    gap: 0;
+  }
+  .trip-tab {
+    padding: 10px 0;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--ink-3);
+    margin-right: 24px;
+    position: relative;
+    white-space: nowrap;
+  }
+  .trip-tab.active {
+    color: var(--brand);
+  }
+  .trip-tab.active::after {
+    content: '';
+    position: absolute;
+    bottom: -1px;
+    left: 0;
+    right: 0;
+    height: 2px;
+    background: var(--brand);
+    border-radius: 2px 2px 0 0;
+  }
+
+  /* ============================
+     SCREEN 3 — ITINERARY
+  ============================ */
+  .itinerary-header {
+    padding: 8px 20px 0;
+    background: var(--bg-base);
+    flex-shrink: 0;
+  }
+  .back-row {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    margin-bottom: 4px;
+  }
+  .back-label {
+    font-size: 16px;
+    color: var(--brand);
+    font-weight: 500;
+  }
+  .screen-title {
+    font-size: 26px;
+    font-weight: 700;
+    color: var(--ink);
+    letter-spacing: -0.02em;
+    margin-bottom: 12px;
+  }
+
+  .day-chips {
+    display: flex;
+    gap: 8px;
+    overflow-x: auto;
+    scrollbar-width: none;
+    padding-bottom: 12px;
+  }
+  .day-chips::-webkit-scrollbar { display: none; }
+  .day-chip {
+    padding: 6px 14px;
+    border-radius: 999px;
+    font-size: 13px;
+    font-weight: 600;
+    white-space: nowrap;
+    border: 1.5px solid var(--border);
+    color: var(--ink-2);
+    background: var(--bg-surface);
+    flex-shrink: 0;
+  }
+  .day-chip.active {
+    background: var(--brand);
+    border-color: var(--brand);
+    color: white;
+  }
+
+  .timeline-scroll {
+    flex: 1;
+    overflow-y: auto;
+    scrollbar-width: none;
+    padding: 4px 20px 100px;
+  }
+  .timeline-scroll::-webkit-scrollbar { display: none; }
+
+  .day-section { margin-bottom: 8px; }
+  .day-header-sticky {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    padding: 12px 0 10px;
+    background: var(--bg-base);
+    position: sticky;
+    top: 0;
+    z-index: 5;
+  }
+  .day-stamp {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--gold);
+    letter-spacing: 0.06em;
+  }
+  .day-date-text {
+    font-size: 13px;
+    color: var(--ink-3);
+  }
+
+  .timeline-body {
+    display: flex;
+    gap: 0;
+  }
+  .timeline-line-col {
+    width: 32px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    flex-shrink: 0;
+    position: relative;
+  }
+  .tl-line {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 50%;
+    width: 2px;
+    background: var(--border);
+    transform: translateX(-50%);
+  }
+  .tl-node {
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    border: 3px solid var(--bg-base);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 10px;
+    margin-top: 14px;
+    position: relative;
+    z-index: 2;
+    flex-shrink: 0;
+  }
+  .tl-node.flight { background: var(--ocean); }
+  .tl-node.hotel { background: var(--planning); }
+  .tl-node.food { background: var(--brand); }
+  .tl-node.activity { background: var(--active); }
+
+  .tl-items-col {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding-bottom: 8px;
+  }
+
+  .tl-card {
+    background: var(--bg-surface);
+    border: 1px solid var(--border);
+    border-radius: var(--r-card);
+    padding: 12px;
+    box-shadow: 0 1px 4px rgba(26,21,18,0.05);
+    margin-top: 4px;
+  }
+  .tl-card-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 8px;
+  }
+  .tl-card-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--ink);
+    line-height: 1.3;
+  }
+  .tl-card-time {
+    font-size: 11px;
+    color: var(--ink-3);
+    margin-top: 3px;
+  }
+  .tl-card-chips {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: 8px;
+    flex-wrap: wrap;
+  }
+  .tl-chip {
+    padding: 3px 8px;
+    border-radius: 6px;
+    font-size: 10px;
+    font-weight: 600;
+  }
+  .tl-chip.loc { background: rgba(45,106,143,0.1); color: var(--ocean); }
+  .tl-chip.cost { background: rgba(242,169,59,0.12); color: #b07d1a; }
+  .tl-chip.airline { background: var(--bg-sunken); color: var(--ink-2); }
+
+  .confirm-avatars {
+    display: flex;
+    align-items: center;
+  }
+  .confirm-avatar {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    border: 1.5px solid var(--bg-surface);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 7px;
+    font-weight: 700;
+    color: white;
+    margin-left: -5px;
+    flex-shrink: 0;
+  }
+  .confirm-avatar:first-child { margin-left: 0; }
+
+  /* FAB */
+  .fab {
+    position: absolute;
+    bottom: 94px;
+    right: 20px;
+    width: 52px;
+    height: 52px;
+    border-radius: 50%;
+    background: var(--brand);
+    box-shadow: 0 4px 16px rgba(232,98,42,0.45);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 20;
+  }
+
+  /* ============================
+     SCREEN 4 — BOTTOM SHEET
+  ============================ */
+  .sheet-screen {
+    position: relative;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  .sheet-bg-blur {
+    position: absolute;
+    inset: 0;
+    background: rgba(26,21,18,0.38);
+    backdrop-filter: blur(2px);
+    -webkit-backdrop-filter: blur(2px);
+    z-index: 10;
+  }
+  /* show s3 content underneath */
+  .sheet-bg-content {
+    position: absolute;
+    inset: 0;
+    overflow: hidden;
+  }
+
+  .bottom-sheet {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: var(--bg-surface);
+    border-radius: var(--r-sheet) var(--r-sheet) 0 0;
+    z-index: 20;
+    padding-bottom: 8px;
+    box-shadow: 0 -8px 40px rgba(26,21,18,0.18);
+  }
+  .sheet-handle {
+    width: 36px;
+    height: 4px;
+    background: var(--border-strong);
+    border-radius: 2px;
+    margin: 10px auto 14px;
+  }
+  .sheet-title {
+    font-size: 17px;
+    font-weight: 700;
+    color: var(--ink);
+    padding: 0 20px 14px;
+  }
+  .sheet-body {
+    padding: 0 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .type-picker {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+  }
+  .type-chip {
+    border: 1.5px solid var(--border);
+    border-radius: 12px;
+    padding: 8px 4px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--ink-2);
+    background: var(--bg-surface);
+  }
+  .type-chip.selected {
+    border-color: var(--brand);
+    background: var(--brand-light);
+    color: var(--brand);
+  }
+  .type-emoji { font-size: 18px; }
+
+  .form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+  }
+  .form-label {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--ink-2);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+  }
+  .form-input {
+    background: var(--bg-sunken);
+    border: 1.5px solid var(--border);
+    border-radius: 10px;
+    padding: 10px 12px;
+    font-size: 14px;
+    font-family: var(--font);
+    color: var(--ink);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .form-input.placeholder { color: var(--ink-3); }
+  .form-input.active-input {
+    border-color: var(--brand);
+    background: #fff;
+  }
+  .input-icon { flex-shrink: 0; }
+
+  .form-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+  }
+
+  .sheet-btn {
+    background: var(--brand);
+    color: white;
+    border-radius: var(--r-btn);
+    padding: 14px 20px;
+    font-size: 15px;
+    font-weight: 700;
+    font-family: var(--font);
+    text-align: center;
+    box-shadow: 0 2px 10px rgba(232,98,42,0.35);
+    margin: 4px 20px 0;
+    letter-spacing: -0.01em;
+  }
+
+  /* ============================
+     SVG ICONS
+  ============================ */
+  svg { display: block; }
+
+  .section-gap { margin-bottom: 20px; }
+</style>
+</head>
+<body>
+
+<div class="page-header">
+  <h1>TravelPlanner — Design Preview</h1>
+  <p>4 key screens · iPhone 14 Pro (390 × 844) · Light mode</p>
+</div>
+
+<div class="frames-row">
+
+  <!-- ======================== FRAME 1: DASHBOARD ======================== -->
+  <div class="frame-wrapper">
+    <span class="frame-label">01 · Dashboard</span>
+    <div class="iphone">
+      <div class="dynamic-island"></div>
+      <div class="iphone-screen">
+
+        <!-- Status bar -->
+        <div class="status-bar">
+          <span class="time">9:41</span>
+          <div class="status-icons">
+            <!-- Signal -->
+            <svg width="17" height="12" viewBox="0 0 17 12" fill="none">
+              <rect x="0" y="6" width="3" height="6" rx="1" fill="#1A1512"/>
+              <rect x="4.5" y="4" width="3" height="8" rx="1" fill="#1A1512"/>
+              <rect x="9" y="2" width="3" height="10" rx="1" fill="#1A1512"/>
+              <rect x="13.5" y="0" width="3" height="12" rx="1" fill="#1A1512"/>
+            </svg>
+            <!-- WiFi -->
+            <svg width="16" height="12" viewBox="0 0 16 12" fill="none">
+              <path d="M8 9.5a1.5 1.5 0 1 1 0 3 1.5 1.5 0 0 1 0-3z" fill="#1A1512"/>
+              <path d="M3.5 6.5C4.9 5.1 6.4 4.5 8 4.5s3.1.6 4.5 2" stroke="#1A1512" stroke-width="1.5" stroke-linecap="round" fill="none"/>
+              <path d="M1 4C3 2 5.4 1 8 1s5 1 7 3" stroke="#1A1512" stroke-width="1.5" stroke-linecap="round" fill="none"/>
+            </svg>
+            <!-- Battery -->
+            <svg width="25" height="12" viewBox="0 0 25 12" fill="none">
+              <rect x="0.5" y="0.5" width="21" height="11" rx="3.5" stroke="#1A1512" stroke-opacity="0.35"/>
+              <rect x="2" y="2" width="16" height="8" rx="2" fill="#1A1512"/>
+              <path d="M23 4v4a2 2 0 0 0 0-4z" fill="#1A1512" fill-opacity="0.4"/>
+            </svg>
+          </div>
+        </div>
+
+        <div class="s1-scroll">
+          <!-- Greeting -->
+          <div class="greeting">
+            <h1>Good morning, Alex 👋</h1>
+            <p>You have 2 upcoming trips</p>
+          </div>
+
+          <!-- Upcoming trips -->
+          <div class="section-gap">
+            <div class="section-header">
+              <span class="section-title">Upcoming Trips</span>
+              <span class="section-link">See all</span>
+            </div>
+
+            <!-- Tokyo card -->
+            <div class="trip-card">
+              <div class="trip-card-hero tc-tokyo">
+                <div class="trip-card-hero-content">
+                  <div class="trip-name-hero">Tokyo Adventure</div>
+                  <div class="trip-meta-hero">📍 Tokyo, Japan · Mar 15–22</div>
+                </div>
+              </div>
+              <div class="trip-card-body">
+                <div class="trip-card-body-left">
+                  <span class="group-tag">College Squad</span>
+                  <span class="status-badge planning">
+                    <span class="status-dot"></span>Planning
+                  </span>
+                </div>
+                <div class="avatar-stack">
+                  <div class="avatar av-a">A</div>
+                  <div class="avatar av-b">B</div>
+                  <div class="avatar av-c">C</div>
+                  <div class="avatar av-d">D</div>
+                  <div class="avatar av-more">+2</div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Bali card -->
+            <div class="trip-card">
+              <div class="trip-card-hero tc-bali">
+                <div class="trip-card-hero-content">
+                  <div class="trip-name-hero">Bali Escape</div>
+                  <div class="trip-meta-hero">📍 Bali, Indonesia · Apr 3–10</div>
+                </div>
+              </div>
+              <div class="trip-card-body">
+                <div class="trip-card-body-left">
+                  <span class="group-tag">Family</span>
+                  <span class="status-badge active">
+                    <span class="status-dot"></span>Active
+                  </span>
+                </div>
+                <div class="avatar-stack">
+                  <div class="avatar av-a">A</div>
+                  <div class="avatar av-e">E</div>
+                  <div class="avatar av-b">B</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Past trips -->
+          <div>
+            <div class="section-header">
+              <span class="section-title">Past Trips</span>
+              <span class="section-link">See all</span>
+            </div>
+            <div class="past-trip-card">
+              <div class="past-trip-thumb"></div>
+              <div class="past-trip-info">
+                <div class="past-trip-name">Kyoto 2024</div>
+                <div class="past-trip-meta">Oct 8–14, 2024 · 6 days</div>
+              </div>
+              <span class="status-badge completed">
+                <span class="status-dot"></span>Done
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Bottom nav -->
+        <div class="bottom-nav">
+          <div class="nav-item active">
+            <div class="nav-icon">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#E8622A" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
+                <polyline points="9 22 9 12 15 12 15 22"/>
+              </svg>
+              <div class="nav-dot"></div>
+            </div>
+            <span class="nav-label" style="color:var(--brand)">Home</span>
+          </div>
+          <div class="nav-item">
+            <div class="nav-icon">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#A09B96" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/>
+                <circle cx="12" cy="10" r="3"/>
+              </svg>
+            </div>
+            <span class="nav-label">Trips</span>
+          </div>
+          <div class="nav-item">
+            <div class="nav-icon">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#A09B96" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+                <circle cx="9" cy="7" r="4"/>
+                <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
+                <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+              </svg>
+            </div>
+            <span class="nav-label">Groups</span>
+          </div>
+          <div class="nav-item">
+            <div class="nav-icon">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#A09B96" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+                <circle cx="12" cy="7" r="4"/>
+              </svg>
+            </div>
+            <span class="nav-label">Profile</span>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- ======================== FRAME 2: TRIP OVERVIEW ======================== -->
+  <div class="frame-wrapper">
+    <span class="frame-label">02 · Trip Overview</span>
+    <div class="iphone">
+      <div class="dynamic-island"></div>
+      <div class="iphone-screen" style="background:var(--bg-base)">
+
+        <!-- Hero with status bar overlay -->
+        <div style="position:relative;flex-shrink:0">
+          <div class="trip-hero">
+            <!-- Decorative city silhouette -->
+            <svg class="skyline" viewBox="0 0 390 100" preserveAspectRatio="none" fill="white">
+              <path d="M0 100 L0 70 L10 70 L10 55 L15 55 L15 45 L20 45 L20 55 L25 55 L25 70 L35 70 L35 50 L40 50 L40 35 L42 35 L42 30 L44 30 L44 35 L46 35 L46 50 L55 50 L55 65 L60 65 L60 40 L65 40 L65 25 L67 25 L67 15 L69 15 L69 10 L71 10 L71 15 L73 15 L73 25 L75 25 L75 40 L80 40 L80 55 L90 55 L90 45 L95 45 L95 35 L100 35 L100 45 L105 45 L105 55 L120 55 L120 60 L130 60 L130 40 L135 40 L135 28 L140 28 L140 40 L145 40 L145 60 L155 60 L155 50 L165 50 L165 35 L168 35 L168 25 L172 25 L172 35 L175 35 L175 50 L185 50 L185 65 L195 65 L195 50 L200 50 L200 38 L202 38 L202 30 L205 30 L205 38 L208 38 L208 50 L220 50 L220 60 L230 60 L230 45 L235 45 L235 30 L240 30 L240 45 L245 45 L245 55 L255 55 L255 65 L265 65 L265 50 L270 50 L270 40 L275 40 L275 50 L280 50 L280 65 L295 65 L295 55 L300 55 L300 42 L305 42 L305 55 L310 55 L310 65 L325 65 L325 55 L335 55 L335 40 L340 40 L340 55 L350 55 L350 65 L365 65 L365 58 L375 58 L375 70 L390 70 L390 100 Z"/>
+            </svg>
+            <div class="trip-hero-nav">
+              <div class="hero-icon-btn">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                  <polyline points="15 18 9 12 15 6"/>
+                </svg>
+              </div>
+              <div class="hero-icon-btn">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/>
+                  <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/>
+                  <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/>
+                </svg>
+              </div>
+            </div>
+            <div class="trip-hero-content">
+              <div class="trip-hero-name">Tokyo Adventure</div>
+              <div class="trip-hero-dates">Mar 15 – Mar 22, 2025 · 7 days</div>
+            </div>
+          </div>
+          <!-- Fake status bar overlay (shown in hero area) -->
+          <div style="position:absolute;top:0;left:0;right:0;height:54px;display:flex;align-items:flex-start;justify-content:space-between;padding:14px 28px 0;z-index:20">
+            <span style="font-size:15px;font-weight:600;color:white;letter-spacing:-0.01em">9:41</span>
+            <div style="display:flex;align-items:center;gap:6px">
+              <svg width="17" height="12" viewBox="0 0 17 12" fill="none">
+                <rect x="0" y="6" width="3" height="6" rx="1" fill="white"/>
+                <rect x="4.5" y="4" width="3" height="8" rx="1" fill="white"/>
+                <rect x="9" y="2" width="3" height="10" rx="1" fill="white"/>
+                <rect x="13.5" y="0" width="3" height="12" rx="1" fill="white"/>
+              </svg>
+              <svg width="16" height="12" viewBox="0 0 16 12" fill="none">
+                <path d="M8 9.5a1.5 1.5 0 1 1 0 3 1.5 1.5 0 0 1 0-3z" fill="white"/>
+                <path d="M3.5 6.5C4.9 5.1 6.4 4.5 8 4.5s3.1.6 4.5 2" stroke="white" stroke-width="1.5" stroke-linecap="round" fill="none"/>
+                <path d="M1 4C3 2 5.4 1 8 1s5 1 7 3" stroke="white" stroke-width="1.5" stroke-linecap="round" fill="none"/>
+              </svg>
+              <svg width="25" height="12" viewBox="0 0 25 12" fill="none">
+                <rect x="0.5" y="0.5" width="21" height="11" rx="3.5" stroke="white" stroke-opacity="0.5"/>
+                <rect x="2" y="2" width="16" height="8" rx="2" fill="white"/>
+                <path d="M23 4v4a2 2 0 0 0 0-4z" fill="white" fill-opacity="0.5"/>
+              </svg>
+            </div>
+          </div>
+        </div>
+
+        <!-- Tabs -->
+        <div class="trip-tabs">
+          <div class="trip-tab active">Overview</div>
+          <div class="trip-tab">Itinerary</div>
+          <div class="trip-tab">Files</div>
+          <div class="trip-tab">Chat</div>
+        </div>
+
+        <!-- Overview content -->
+        <div class="overview-body">
+          <!-- Members -->
+          <div class="members-row">
+            <div class="avatar-stack">
+              <div class="avatar av-a">A</div>
+              <div class="avatar av-b">B</div>
+              <div class="avatar av-c">C</div>
+              <div class="avatar av-d">D</div>
+              <div class="avatar av-more">+2</div>
+            </div>
+            <span class="members-label">6 members going</span>
+          </div>
+
+          <!-- Next up -->
+          <div class="next-up-card">
+            <div class="next-up-label">NEXT UP</div>
+            <div class="next-up-title">✈️ Flight to Tokyo</div>
+            <div class="next-up-sub">Tomorrow, 10:30 AM · Narita Airport (NRT)</div>
+          </div>
+
+          <!-- Stats -->
+          <div class="stats-row">
+            <div class="stat-chip">
+              <span style="font-size:18px">📍</span>
+              <span class="stat-value">12</span>
+              <span class="stat-label">Places</span>
+            </div>
+            <div class="stat-chip">
+              <span style="font-size:18px">💬</span>
+              <span class="stat-value">8</span>
+              <span class="stat-label">Comments</span>
+            </div>
+            <div class="stat-chip">
+              <span style="font-size:18px">📎</span>
+              <span class="stat-value">3</span>
+              <span class="stat-label">Files</span>
+            </div>
+          </div>
+
+          <!-- Recent activity -->
+          <div>
+            <div class="section-header">
+              <span class="section-title" style="font-size:15px">Recent Activity</span>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:10px">
+              <div style="display:flex;align-items:center;gap:10px">
+                <div class="avatar av-b" style="width:32px;height:32px;font-size:11px;flex-shrink:0">B</div>
+                <div>
+                  <span style="font-size:13px;color:var(--ink);font-weight:500">Ben added</span>
+                  <span style="font-size:13px;color:var(--ink-2)"> "teamLab Planets" to Day 2</span>
+                  <div style="font-size:11px;color:var(--ink-3);margin-top:2px">2 hours ago</div>
+                </div>
+              </div>
+              <div style="display:flex;align-items:center;gap:10px">
+                <div class="avatar av-c" style="width:32px;height:32px;font-size:11px;flex-shrink:0">C</div>
+                <div>
+                  <span style="font-size:13px;color:var(--ink);font-weight:500">Carol confirmed</span>
+                  <span style="font-size:13px;color:var(--ink-2)"> Shinjuku Granbell Hotel</span>
+                  <div style="font-size:11px;color:var(--ink-3);margin-top:2px">5 hours ago</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Bottom nav -->
+        <div class="bottom-nav">
+          <div class="nav-item">
+            <div class="nav-icon">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#A09B96" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
+                <polyline points="9 22 9 12 15 12 15 22"/>
+              </svg>
+            </div>
+            <span class="nav-label">Home</span>
+          </div>
+          <div class="nav-item active">
+            <div class="nav-icon">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#E8622A" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/>
+                <circle cx="12" cy="10" r="3" fill="#E8622A"/>
+              </svg>
+              <div class="nav-dot"></div>
+            </div>
+            <span class="nav-label" style="color:var(--brand)">Trips</span>
+          </div>
+          <div class="nav-item">
+            <div class="nav-icon">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#A09B96" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+                <circle cx="9" cy="7" r="4"/>
+                <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
+                <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+              </svg>
+            </div>
+            <span class="nav-label">Groups</span>
+          </div>
+          <div class="nav-item">
+            <div class="nav-icon">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#A09B96" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+                <circle cx="12" cy="7" r="4"/>
+              </svg>
+            </div>
+            <span class="nav-label">Profile</span>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- ======================== FRAME 3: ITINERARY ======================== -->
+  <div class="frame-wrapper">
+    <span class="frame-label">03 · Itinerary Timeline</span>
+    <div class="iphone">
+      <div class="dynamic-island"></div>
+      <div class="iphone-screen" style="position:relative">
+
+        <!-- Status bar -->
+        <div class="status-bar">
+          <span class="time">9:41</span>
+          <div class="status-icons">
+            <svg width="17" height="12" viewBox="0 0 17 12" fill="none">
+              <rect x="0" y="6" width="3" height="6" rx="1" fill="#1A1512"/>
+              <rect x="4.5" y="4" width="3" height="8" rx="1" fill="#1A1512"/>
+              <rect x="9" y="2" width="3" height="10" rx="1" fill="#1A1512"/>
+              <rect x="13.5" y="0" width="3" height="12" rx="1" fill="#1A1512"/>
+            </svg>
+            <svg width="16" height="12" viewBox="0 0 16 12" fill="none">
+              <path d="M8 9.5a1.5 1.5 0 1 1 0 3 1.5 1.5 0 0 1 0-3z" fill="#1A1512"/>
+              <path d="M3.5 6.5C4.9 5.1 6.4 4.5 8 4.5s3.1.6 4.5 2" stroke="#1A1512" stroke-width="1.5" stroke-linecap="round" fill="none"/>
+              <path d="M1 4C3 2 5.4 1 8 1s5 1 7 3" stroke="#1A1512" stroke-width="1.5" stroke-linecap="round" fill="none"/>
+            </svg>
+            <svg width="25" height="12" viewBox="0 0 25 12" fill="none">
+              <rect x="0.5" y="0.5" width="21" height="11" rx="3.5" stroke="#1A1512" stroke-opacity="0.35"/>
+              <rect x="2" y="2" width="16" height="8" rx="2" fill="#1A1512"/>
+              <path d="M23 4v4a2 2 0 0 0 0-4z" fill="#1A1512" fill-opacity="0.4"/>
+            </svg>
+          </div>
+        </div>
+
+        <!-- Header -->
+        <div class="itinerary-header">
+          <div class="back-row">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#E8622A" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="15 18 9 12 15 6"/>
+            </svg>
+            <span class="back-label">Tokyo Adventure</span>
+          </div>
+          <div class="screen-title">Itinerary</div>
+          <!-- Day chips -->
+          <div class="day-chips">
+            <div class="day-chip active">All</div>
+            <div class="day-chip">Day 1</div>
+            <div class="day-chip">Day 2</div>
+            <div class="day-chip">Day 3</div>
+            <div class="day-chip">Day 4</div>
+            <div class="day-chip">Day 5</div>
+          </div>
+        </div>
+
+        <!-- Timeline scroll -->
+        <div class="timeline-scroll">
+
+          <!-- DAY 01 -->
+          <div class="day-section">
+            <div class="day-header-sticky">
+              <span class="day-stamp">DAY 01</span>
+              <span class="day-date-text">Saturday, Mar 15</span>
+            </div>
+            <div class="timeline-body">
+              <div class="timeline-line-col">
+                <div class="tl-line"></div>
+                <div class="tl-node flight">✈</div>
+                <div style="flex:1"></div>
+                <div class="tl-node hotel" style="margin-top:74px">🏨</div>
+              </div>
+              <div class="tl-items-col">
+                <!-- Flight -->
+                <div class="tl-card">
+                  <div class="tl-card-top">
+                    <div>
+                      <div class="tl-card-title">Flight to Tokyo</div>
+                      <div class="tl-card-time">10:30 AM → 6:45 PM +1</div>
+                    </div>
+                    <div class="confirm-avatars">
+                      <div class="confirm-avatar av-a">A</div>
+                      <div class="confirm-avatar av-b">B</div>
+                      <div class="confirm-avatar av-c">C</div>
+                      <div class="confirm-avatar av-d">D</div>
+                    </div>
+                  </div>
+                  <div class="tl-card-chips">
+                    <span class="tl-chip airline">JAL 772</span>
+                    <span class="tl-chip loc">NRT Terminal 2</span>
+                  </div>
+                </div>
+                <!-- Hotel -->
+                <div class="tl-card">
+                  <div class="tl-card-top">
+                    <div>
+                      <div class="tl-card-title">Shinjuku Granbell Hotel</div>
+                      <div class="tl-card-time">Check-in 3:00 PM</div>
+                    </div>
+                    <div class="confirm-avatars">
+                      <div class="confirm-avatar av-a">A</div>
+                      <div class="confirm-avatar av-b">B</div>
+                      <div class="confirm-avatar av-c">C</div>
+                    </div>
+                  </div>
+                  <div class="tl-card-chips">
+                    <span class="tl-chip loc">Shinjuku, Tokyo</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- DAY 02 -->
+          <div class="day-section">
+            <div class="day-header-sticky">
+              <span class="day-stamp">DAY 02</span>
+              <span class="day-date-text">Sunday, Mar 16</span>
+            </div>
+            <div class="timeline-body">
+              <div class="timeline-line-col">
+                <div class="tl-line"></div>
+                <div class="tl-node food">🍜</div>
+                <div style="flex:1"></div>
+                <div class="tl-node activity" style="margin-top:74px">🎭</div>
+              </div>
+              <div class="tl-items-col">
+                <!-- Ramen -->
+                <div class="tl-card">
+                  <div class="tl-card-top">
+                    <div>
+                      <div class="tl-card-title">Ichiran Ramen</div>
+                      <div class="tl-card-time">12:00 PM · Lunch</div>
+                    </div>
+                    <div class="confirm-avatars">
+                      <div class="confirm-avatar av-a">A</div>
+                      <div class="confirm-avatar av-c">C</div>
+                    </div>
+                  </div>
+                  <div class="tl-card-chips">
+                    <span class="tl-chip loc">Shibuya</span>
+                  </div>
+                </div>
+                <!-- teamLab -->
+                <div class="tl-card">
+                  <div class="tl-card-top">
+                    <div>
+                      <div class="tl-card-title">teamLab Planets</div>
+                      <div class="tl-card-time">3:00 PM – 6:00 PM</div>
+                    </div>
+                    <div class="confirm-avatars">
+                      <div class="confirm-avatar av-a">A</div>
+                      <div class="confirm-avatar av-b">B</div>
+                      <div class="confirm-avatar av-c">C</div>
+                      <div class="confirm-avatar av-d">D</div>
+                    </div>
+                  </div>
+                  <div class="tl-card-chips">
+                    <span class="tl-chip cost">¥3,200</span>
+                    <span class="tl-chip loc">Toyosu</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- FAB -->
+        <div class="fab">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round">
+            <line x1="12" y1="5" x2="12" y2="19"/>
+            <line x1="5" y1="12" x2="19" y2="12"/>
+          </svg>
+        </div>
+
+        <!-- Bottom nav -->
+        <div class="bottom-nav">
+          <div class="nav-item">
+            <div class="nav-icon">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#A09B96" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
+                <polyline points="9 22 9 12 15 12 15 22"/>
+              </svg>
+            </div>
+            <span class="nav-label">Home</span>
+          </div>
+          <div class="nav-item active">
+            <div class="nav-icon">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#E8622A" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/>
+                <circle cx="12" cy="10" r="3" fill="#E8622A"/>
+              </svg>
+              <div class="nav-dot"></div>
+            </div>
+            <span class="nav-label" style="color:var(--brand)">Trips</span>
+          </div>
+          <div class="nav-item">
+            <div class="nav-icon">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#A09B96" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+                <circle cx="9" cy="7" r="4"/>
+                <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
+                <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+              </svg>
+            </div>
+            <span class="nav-label">Groups</span>
+          </div>
+          <div class="nav-item">
+            <div class="nav-icon">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#A09B96" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+                <circle cx="12" cy="7" r="4"/>
+              </svg>
+            </div>
+            <span class="nav-label">Profile</span>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- ======================== FRAME 4: BOTTOM SHEET ======================== -->
+  <div class="frame-wrapper">
+    <span class="frame-label">04 · Add Item Sheet</span>
+    <div class="iphone">
+      <div class="dynamic-island"></div>
+      <div class="iphone-screen" style="position:relative;overflow:hidden">
+
+        <!-- Background: dimmed itinerary screen -->
+        <div style="position:absolute;inset:0;background:var(--bg-base);z-index:0">
+          <!-- Fake status bar -->
+          <div class="status-bar" style="position:relative;z-index:2">
+            <span class="time">9:41</span>
+            <div class="status-icons">
+              <svg width="17" height="12" viewBox="0 0 17 12" fill="none">
+                <rect x="0" y="6" width="3" height="6" rx="1" fill="#1A1512"/>
+                <rect x="4.5" y="4" width="3" height="8" rx="1" fill="#1A1512"/>
+                <rect x="9" y="2" width="3" height="10" rx="1" fill="#1A1512"/>
+                <rect x="13.5" y="0" width="3" height="12" rx="1" fill="#1A1512"/>
+              </svg>
+              <svg width="25" height="12" viewBox="0 0 25 12" fill="none">
+                <rect x="0.5" y="0.5" width="21" height="11" rx="3.5" stroke="#1A1512" stroke-opacity="0.35"/>
+                <rect x="2" y="2" width="16" height="8" rx="2" fill="#1A1512"/>
+              </svg>
+            </div>
+          </div>
+          <!-- Faint itinerary content visible behind -->
+          <div style="padding:8px 20px;opacity:0.4;pointer-events:none">
+            <div style="height:24px;background:var(--border);border-radius:8px;width:60%;margin-bottom:12px"></div>
+            <div style="display:flex;gap:8px;margin-bottom:16px">
+              <div style="height:28px;background:var(--brand);border-radius:999px;width:48px"></div>
+              <div style="height:28px;background:var(--border);border-radius:999px;width:60px"></div>
+              <div style="height:28px;background:var(--border);border-radius:999px;width:60px"></div>
+            </div>
+            <div style="height:72px;background:var(--bg-surface);border-radius:16px;border:1px solid var(--border);margin-bottom:10px"></div>
+            <div style="height:72px;background:var(--bg-surface);border-radius:16px;border:1px solid var(--border)"></div>
+          </div>
+        </div>
+
+        <!-- Dark overlay -->
+        <div style="position:absolute;inset:0;background:rgba(26,21,18,0.40);backdrop-filter:blur(2px);-webkit-backdrop-filter:blur(2px);z-index:10"></div>
+
+        <!-- Bottom sheet -->
+        <div style="position:absolute;bottom:0;left:0;right:0;background:var(--bg-surface);border-radius:24px 24px 0 0;z-index:20;box-shadow:0 -8px 40px rgba(26,21,18,0.20)">
+
+          <div class="sheet-handle"></div>
+          <div class="sheet-title">Add to Itinerary</div>
+
+          <div class="sheet-body">
+            <!-- Type picker -->
+            <div>
+              <div class="form-label" style="margin-bottom:8px">Type</div>
+              <div class="type-picker">
+                <div class="type-chip selected">
+                  <span class="type-emoji">✈️</span>
+                  <span>Flight</span>
+                </div>
+                <div class="type-chip">
+                  <span class="type-emoji">🏨</span>
+                  <span>Hotel</span>
+                </div>
+                <div class="type-chip">
+                  <span class="type-emoji">🍜</span>
+                  <span>Food</span>
+                </div>
+                <div class="type-chip">
+                  <span class="type-emoji">🎭</span>
+                  <span>Activity</span>
+                </div>
+                <div class="type-chip">
+                  <span class="type-emoji">🚌</span>
+                  <span>Transport</span>
+                </div>
+                <div class="type-chip">
+                  <span class="type-emoji">📝</span>
+                  <span>Note</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Title -->
+            <div class="form-group">
+              <span class="form-label">Title</span>
+              <div class="form-input placeholder">
+                <span>e.g. Senso-ji Temple</span>
+              </div>
+            </div>
+
+            <!-- Date/Time + Cost row -->
+            <div class="form-grid">
+              <div class="form-group">
+                <span class="form-label">Date & Time</span>
+                <div class="form-input" style="font-size:13px">
+                  <svg class="input-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#A09B96" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
+                    <line x1="16" y1="2" x2="16" y2="6"/>
+                    <line x1="8" y1="2" x2="8" y2="6"/>
+                    <line x1="3" y1="10" x2="21" y2="10"/>
+                  </svg>
+                  <span style="color:var(--ink);font-size:12px">Mar 16, 2:00 PM</span>
+                </div>
+              </div>
+              <div class="form-group">
+                <span class="form-label">Cost</span>
+                <div class="form-input">
+                  <span style="color:var(--ink-3);font-size:13px">¥</span>
+                  <span style="color:var(--ink-3);font-size:13px">0</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Location -->
+            <div class="form-group">
+              <span class="form-label">Location</span>
+              <div class="form-input placeholder">
+                <svg class="input-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#A09B96" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <circle cx="11" cy="11" r="8"/>
+                  <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+                </svg>
+                <span>Search for a place...</span>
+              </div>
+            </div>
+
+            <!-- Notes -->
+            <div class="form-group">
+              <span class="form-label">Notes</span>
+              <div class="form-input placeholder" style="min-height:52px;align-items:flex-start;padding-top:10px">
+                <span>Any details, booking refs...</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- CTA -->
+          <div class="sheet-btn">Add to Itinerary</div>
+
+          <!-- Safe area spacer -->
+          <div style="height:24px"></div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- Footer note -->
+<div style="text-align:center;margin-top:40px;font-size:12px;color:#9a938c;font-family:var(--font)">
+  TravelPlanner · Design System v1 · Plus Jakarta Sans · Terracotta #E8622A
+</div>
+
+</body>
+</html>
