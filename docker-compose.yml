@@ -3,6 +3,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+    container_name: travel-planner-app
     restart: unless-stopped
     env_file:
       - .env
@@ -15,15 +16,16 @@ services:
     expose:
       - "3000"
     depends_on: []  # PostgreSQL is external — no dependency block needed
-    healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost:3000/api/health"]
-      interval: 30s
-      timeout: 5s
-      retries: 3
-      start_period: 15s
+    #healthcheck:
+    #  test: ["CMD", "wget", "-qO-", "http://localhost:3000/api/health"]
+    #  interval: 30s
+    #  timeout: 5s
+    #  retries: 3
+    #  start_period: 15s
 
   nginx:
     image: nginx:1.27-alpine
+    container_name: travel-planner-nginx
     restart: unless-stopped
     ports:
       - "80:80"
