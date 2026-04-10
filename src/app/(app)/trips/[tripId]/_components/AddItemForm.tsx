@@ -35,14 +35,15 @@ export function AddItemForm({ tripId, onSuccess }: Props) {
   async function geocode(query: string) {
     if (!query.trim()) return;
     try {
+      const token = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
       const res = await fetch(
-        `https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(query)}`,
-        { headers: { "Accept-Language": "en" } }
+        `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(query)}.json?limit=1&access_token=${token}`
       );
-      const data = await res.json() as { lat: string; lon: string }[];
-      if (data[0]) {
-        setLocationLat(data[0].lat);
-        setLocationLng(data[0].lon);
+      const data = await res.json() as { features: { center: [number, number] }[] };
+      const feature = data.features[0];
+      if (feature) {
+        setLocationLng(String(feature.center[0]));
+        setLocationLat(String(feature.center[1]));
       }
     } catch {
       // ignore geocoding errors — location name still saved
