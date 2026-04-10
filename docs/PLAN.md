@@ -88,13 +88,60 @@ Beyond the base schema in `docs/DATABASE.md`:
 
 ## v2 — High-Value Additions
 
-- [x] **Voting / Polls** — yes/maybe/no per itinerary item, tally bar on card
-- [x] **Budget Tracking** — estimated vs actual cost, donut chart, "who paid" log, currency picker, member payer, user-set budget target, itinerary items auto-included
-- [x] **Map View** — Leaflet + Mapbox tiles, pins per item, tap pin → item detail sheet
-- [x] **Place Search** — debounced autocomplete (Mapbox Geocoding) on item add/edit, stores lat/lng for map pins
-- [x] **Packing List** — shared + personal checklists per trip, tap-to-check, swipe-to-delete, grouped by category, progress bar
-- [ ] **Trip Templates** — save completed trip structure as reusable template
-- [ ] **Push Notifications** — Web Push for comments, votes, "trip starts tomorrow"
+### 1. Voting / Polls
+- [x] Yes / maybe / no vote per itinerary item per user
+- [x] Tally bar on itinerary item card (colour-coded vote counts)
+- [x] Tap to change own vote; live update via SSE
+
+### 2. Budget Tracking
+- [x] Expense log per trip (title, amount, category, who paid, date)
+- [x] Currency picker (12 currencies) on each expense
+- [x] Member payer picker — record expense on behalf of another member
+- [x] Donut chart breakdown by category
+- [x] Itinerary items with a cost auto-appear as "Planned" entries in the budget
+- [x] Mark-as-paid workflow — convert a planned item to an actual expense
+- [x] User-set trip budget target (stored on trip) with ✏️ inline edit
+- [x] "vs budget" delta row — green under, red over; hidden when currencies are mixed
+- [x] Mixed-currency handling — "mixed" label in donut centre, per-currency subtotals in legend
+
+### 3. Map View
+- [x] Leaflet map with Mapbox Streets v12 tiles
+- [x] Pin per itinerary item that has a location (lat/lng)
+- [x] Sequence-numbered badge on each pin (order matches itinerary sort order)
+- [x] Tap pin → popup with item title, location, time, "View details" button
+- [x] "Open in Maps ↗" deep-link in popup → opens Google Maps native app
+- [x] Driving route polyline — Mapbox Directions API, actual road path connecting pins in order
+- [x] Route distance — two display locations from the same Directions API call:
+  - **Map tab**: floating pill overlay (bottom-left, above attribution) showing total route km
+  - **Plan tab**: small connector row between consecutive located items showing per-leg distance (e.g. "🚗 12.4 km") — only shown between items that both have a location
+
+### 4. Place Search
+- [x] Debounced autocomplete (Mapbox Geocoding API v5) in Add / Edit item forms
+- [x] Stores `locationName`, `locationLat`, `locationLng` on itinerary item
+- [x] 📍 button beside location input → inline mini-map picker
+- [x] Tap-to-pin on mini-map with reverse geocoding → auto-fills location name
+
+### 5. Packing List
+- [x] Shared + personal item lists per trip
+- [x] Item fields: name, quantity, category (8 categories), shared / just-me toggle
+- [x] Tap-to-check with optimistic update; checked items show strikethrough
+- [x] Swipe-left to delete own items
+- [x] Items grouped by category with emoji headers
+- [x] Progress bar (packed / total count + percentage)
+- [x] Filter pills: All / 👥 Shared / 🔒 Mine
+- [x] Other users' personal items never sent over the wire
+
+### 6. Trip Templates
+- [ ] Save a completed trip's structure (itinerary items, categories, days) as a reusable template
+- [ ] Template library screen — browse own + shared templates
+- [ ] Create new trip from template — copies items with relative day offsets
+- [ ] Template name, description, cover image
+
+### 7. Push Notifications
+- [ ] Web Push subscription (service worker `pushManager.subscribe`)
+- [ ] Server-side push via Web Push protocol (VAPID keys)
+- [ ] Notify on: new comment on own item, new vote on own item, trip starts tomorrow
+- [ ] Notification settings per trip (opt-out per event type)
 
 ---
 

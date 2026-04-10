@@ -131,11 +131,20 @@ function usePullToRefresh(onRefresh: () => Promise<void>) {
   return { pulling, refreshing };
 }
 
+const MAPBOX_TOKEN = process.env.NEXT_PUBLIC_MAPBOX_TOKEN ?? "";
+
+type RouteData = {
+  coords: [number, number][];
+  totalKm: number;
+  legKms: number[];
+};
+
 export function TripDetailClient({ tripId, userId }: Props) {
   const router = useRouter();
   const [tab, setTab] = useState<"overview" | "itinerary" | "map" | "budget" | "pack" | "chat">("overview");
   const [addItemOpen, setAddItemOpen] = useState(false);
   const [mapSelectedId, setMapSelectedId] = useState<string | null>(null);
+  const [routeData, setRouteData] = useState<RouteData | null>(null);
   const utils = api.useUtils();
 
   const { data: trip, isLoading } = api.trips.getById.useQuery({ tripId });
@@ -174,6 +183,42 @@ export function TripDetailClient({ tripId, userId }: Props) {
     };
     return () => es.close();
   }, [tripId, utils]);
+
+  // Fetch driving route once when located items are known
+  const pinnedItems = (trip?.itineraryItems ?? []).filter(
+    (i) => i.locationLat !== null && i.locationLng !== null
+  );
+  const posKey = pinnedItems.map((i) => `${i.locationLat},${i.locationLng}`).join("|");
+
+  useEffect(() => {
+    if (pinnedItems.length < 2) {
+      setRouteData(null);
+      return;
+    }
+    const coordStr = pinnedItems.map((i) => `${i.locationLng},${i.locationLat}`).join(";");
+    fetch(
+      `https://api.mapbox.com/directions/v5/mapbox/driving/${coordStr}?geometries=geojson&overview=full&access_token=${MAPBOX_TOKEN}`
+    )
+      .then((r) => r.json())
+      .then((data: { routes?: { distance: number; geometry: { coordinates: [number, number][] }; legs: { distance: number }[] }[] }) => {
+        const route = data.routes?.[0];
+        if (!route) return;
+        setRouteData({
+          coords: route.geometry.coordinates.map(([lng, lat]) => [lat, lng]),
+          totalKm: route.distance / 1000,
+          legKms: route.legs.map((l) => l.distance / 1000),
+        });
+      })
+      .catch(() => setRouteData(null));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [posKey]);
+
+  // Build leg distance map: itemId → km to the next pinned item
+  const legMap = new Map<string, number>();
+  pinnedItems.forEach((item, i) => {
+    const km = routeData?.legKms[i];
+    if (km !== undefined) legMap.set(item.id, km);
+  });
 
   // Pull-to-refresh
   const handleRefresh = useCallback(async () => {
@@ -394,6 +439,7 @@ export function TripDetailClient({ tripId, userId }: Props) {
             items={trip.itineraryItems}
             tripId={trip.id}
             userId={userId}
+            legMap={legMap}
           />
         )}
 
@@ -402,6 +448,8 @@ export function TripDetailClient({ tripId, userId }: Props) {
             <MapView
               items={trip.itineraryItems}
               onSelectItem={(id) => setMapSelectedId(id)}
+              routeCoords={routeData?.coords ?? []}
+              totalKm={routeData?.totalKm}
             />
             <BottomSheet
               open={mapSelectedId !== null}

@@ -1,6 +1,12 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback } from "react";
+import dynamic from "next/dynamic";
+
+const MapPickerMini = dynamic(
+  () => import("./MapPickerMini").then((m) => ({ default: m.MapPickerMini })),
+  { ssr: false }
+);
 
 type Suggestion = {
   placeName: string;
@@ -20,9 +26,12 @@ export function LocationAutocomplete({ value, onChange, placeholder = "Search fo
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
   const [open, setOpen] = useState(false);
   const [activeIdx, setActiveIdx] = useState(-1);
+  const [showMap, setShowMap] = useState(false);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const committed = useRef(false); // true after user picks a suggestion
+  const latRef = useRef<string | undefined>(undefined);
+  const lngRef = useRef<string | undefined>(undefined);
 
   const fetchSuggestions = useCallback(async (query: string) => {
     if (!query.trim() || query.length < 2) {
@@ -61,6 +70,8 @@ export function LocationAutocomplete({ value, onChange, placeholder = "Search fo
 
   function selectSuggestion(s: Suggestion) {
     committed.current = true;
+    latRef.current = s.lat;
+    lngRef.current = s.lng;
     onChange(s.placeName, s.lat, s.lng);
     setSuggestions([]);
     setOpen(false);
@@ -99,15 +110,29 @@ export function LocationAutocomplete({ value, onChange, placeholder = "Search fo
 
   return (
     <div ref={containerRef} style={{ position: "relative" }}>
-      <input
-        type="text"
-        value={value}
-        onChange={handleInputChange}
-        onKeyDown={handleKeyDown}
-        placeholder={placeholder}
-        autoComplete="off"
-        className="w-full px-4 py-3 bg-[#F0EDE8] border border-[#E5E0DA] rounded-[10px] text-[16px] text-[#1A1512] placeholder:text-[#A09B96] focus:outline-none focus:border-[#E8622A]"
-      />
+      <div className="flex gap-2">
+        <input
+          type="text"
+          value={value}
+          onChange={handleInputChange}
+          onKeyDown={handleKeyDown}
+          placeholder={placeholder}
+          autoComplete="off"
+          className="flex-1 px-4 py-3 bg-[#F0EDE8] border border-[#E5E0DA] rounded-[10px] text-[16px] text-[#1A1512] placeholder:text-[#A09B96] focus:outline-none focus:border-[#E8622A]"
+        />
+        <button
+          type="button"
+          onClick={() => setShowMap((v) => !v)}
+          title="Pick on map"
+          className={`flex-shrink-0 w-11 h-11 flex items-center justify-center rounded-[10px] border transition-colors ${
+            showMap
+              ? "border-[#E8622A] bg-[rgba(232,98,42,0.08)] text-[#E8622A]"
+              : "border-[#E5E0DA] bg-[#F0EDE8] text-[#6B6560]"
+          }`}
+        >
+          📍
+        </button>
+      </div>
 
       {open && suggestions.length > 0 && (
         <ul
@@ -132,6 +157,22 @@ export function LocationAutocomplete({ value, onChange, placeholder = "Search fo
             </li>
           ))}
         </ul>
+      )}
+
+      {showMap && (
+        <div className="mt-2">
+          <MapPickerMini
+            initialLat={latRef.current ? parseFloat(latRef.current) : undefined}
+            initialLng={lngRef.current ? parseFloat(lngRef.current) : undefined}
+            onPick={(lat, lng, placeName) => {
+              latRef.current = lat;
+              lngRef.current = lng;
+              committed.current = true;
+              onChange(placeName, lat, lng);
+              setShowMap(false);
+            }}
+          />
+        </div>
       )}
     </div>
   );

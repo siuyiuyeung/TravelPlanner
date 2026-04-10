@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { MapContainer, TileLayer, Marker, Popup, useMap } from "react-leaflet";
+import { MapContainer, TileLayer, Marker, Popup, Polyline, useMap } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 
@@ -18,6 +18,8 @@ type MapItem = {
 type Props = {
   items: MapItem[];
   onSelectItem: (id: string) => void;
+  routeCoords: [number, number][];
+  totalKm?: number | undefined;
 };
 
 const ITEM_EMOJI: Record<string, string> = {
@@ -29,23 +31,33 @@ const ITEM_EMOJI: Record<string, string> = {
   note: "📝",
 };
 
-function makeIcon(emoji: string) {
+function makeIcon(emoji: string, seq: number) {
   return L.divIcon({
-    html: `<div style="
-      width:36px;height:36px;
-      background:#E8622A;
-      border-radius:50% 50% 50% 0;
-      transform:rotate(-45deg);
-      display:flex;align-items:center;justify-content:center;
-      box-shadow:0 2px 6px rgba(0,0,0,0.3);
-      border:2px solid white;
-    ">
-      <span style="transform:rotate(45deg);font-size:16px;line-height:1">${emoji}</span>
+    html: `<div style="position:relative;width:36px;height:36px;">
+      <div style="
+        width:36px;height:36px;
+        background:#E8622A;
+        border-radius:50% 50% 50% 0;
+        transform:rotate(-45deg);
+        display:flex;align-items:center;justify-content:center;
+        box-shadow:0 2px 6px rgba(0,0,0,0.3);
+        border:2px solid white;
+      ">
+        <span style="transform:rotate(45deg);font-size:16px;line-height:1">${emoji}</span>
+      </div>
+      <div style="
+        position:absolute;top:-8px;right:-8px;
+        width:18px;height:18px;border-radius:50%;
+        background:#1A1512;color:#fff;
+        font-size:10px;font-weight:700;font-family:monospace;
+        display:flex;align-items:center;justify-content:center;
+        border:1.5px solid #fff;box-shadow:0 1px 3px rgba(0,0,0,0.4);
+      ">${seq}</div>
     </div>`,
     className: "",
     iconSize: [36, 36],
     iconAnchor: [18, 36],
-    popupAnchor: [0, -38],
+    popupAnchor: [0, -42],
   });
 }
 
@@ -66,7 +78,7 @@ function FitBounds({ positions }: { positions: [number, number][] }) {
   return null;
 }
 
-export function MapViewInner({ items, onSelectItem }: Props) {
+export function MapViewInner({ items, onSelectItem, routeCoords, totalKm }: Props) {
   const pinned = items.filter(
     (i) => i.locationLat !== null && i.locationLng !== null
   );
@@ -102,6 +114,25 @@ export function MapViewInner({ items, onSelectItem }: Props) {
         </div>
       )}
 
+      {totalKm !== undefined && totalKm > 0 && (
+        <div
+          style={{
+            position: "absolute",
+            bottom: 24,
+            left: 12,
+            zIndex: 1000,
+            pointerEvents: "none",
+          }}
+        >
+          <div className="bg-white/95 backdrop-blur-sm rounded-full px-3 py-1.5 shadow-md flex items-center gap-1.5 border border-[#E5E0DA]">
+            <span className="text-[12px]">🚗</span>
+            <span className="text-[12px] font-semibold text-[#1A1512] font-mono">
+              {totalKm < 1 ? `${Math.round(totalKm * 1000)} m` : `${totalKm.toFixed(1)} km`}
+            </span>
+          </div>
+        </div>
+      )}
+
       <MapContainer
         center={defaultCenter}
         zoom={13}
@@ -116,45 +147,55 @@ export function MapViewInner({ items, onSelectItem }: Props) {
         />
         <FitBounds positions={positions} />
 
+        {routeCoords.length > 1 && (
+          <Polyline
+            positions={routeCoords}
+            pathOptions={{ color: "#E8622A", weight: 2.5, opacity: 0.6 }}
+          />
+        )}
+
         {pinned.map((item, idx) => {
           const pos = positions[idx]!;
           const emoji = ITEM_EMOJI[item.type] ?? "📌";
           return (
-            <Marker key={item.id} position={pos} icon={makeIcon(emoji)}>
+            <Marker key={item.id} position={pos} icon={makeIcon(emoji, idx + 1)}>
               <Popup>
-                <div
-                  className="cursor-pointer"
-                  onClick={(e) => { e.stopPropagation(); setTimeout(() => onSelectItem(item.id), 50); }}
-                  style={{ minWidth: 160 }}
-                >
-                  <p style={{ fontWeight: 700, fontSize: 14, marginBottom: 2 }}>
-                    {emoji} {item.title}
-                  </p>
-                  {item.locationName && (
-                    <p style={{ fontSize: 12, color: "#6B6560", marginBottom: 4 }}>
-                      {item.locationName}
-                    </p>
-                  )}
-                  {item.startTime && (
-                    <p style={{ fontSize: 12, color: "#A09B96" }}>
-                      {new Date(item.startTime).toLocaleString("en-US", {
-                        month: "short",
-                        day: "numeric",
-                        hour: "numeric",
-                        minute: "2-digit",
-                      })}
-                    </p>
-                  )}
-                  <p
-                    style={{
-                      fontSize: 12,
-                      color: "#E8622A",
-                      fontWeight: 600,
-                      marginTop: 6,
-                    }}
+                <div style={{ minWidth: 160 }}>
+                  <div
+                    className="cursor-pointer"
+                    onClick={(e) => { e.stopPropagation(); setTimeout(() => onSelectItem(item.id), 50); }}
                   >
-                    View details →
-                  </p>
+                    <p style={{ fontWeight: 700, fontSize: 14, marginBottom: 2 }}>
+                      {emoji} {item.title}
+                    </p>
+                    {item.locationName && (
+                      <p style={{ fontSize: 12, color: "#6B6560", marginBottom: 4 }}>
+                        {item.locationName}
+                      </p>
+                    )}
+                    {item.startTime && (
+                      <p style={{ fontSize: 12, color: "#A09B96" }}>
+                        {new Date(item.startTime).toLocaleString("en-US", {
+                          month: "short",
+                          day: "numeric",
+                          hour: "numeric",
+                          minute: "2-digit",
+                        })}
+                      </p>
+                    )}
+                    <p style={{ fontSize: 12, color: "#E8622A", fontWeight: 600, marginTop: 6 }}>
+                      View details →
+                    </p>
+                  </div>
+                  <a
+                    href={`https://maps.google.com?q=${item.locationLat},${item.locationLng}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={(e) => e.stopPropagation()}
+                    style={{ display: "block", marginTop: 6, textAlign: "center", fontSize: 12, color: "#2D6A8F", textDecoration: "underline" }}
+                  >
+                    Open in Maps ↗
+                  </a>
                 </div>
               </Popup>
             </Marker>

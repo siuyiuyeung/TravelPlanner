@@ -28,6 +28,7 @@ type Props = {
   items: ItineraryItem[];
   tripId: string;
   userId: string;
+  legMap?: Map<string, number> | undefined;
 };
 
 const ITEM_EMOJI: Record<string, string> = {
@@ -196,6 +197,7 @@ function DaySection({
   items,
   userId,
   tripId,
+  legMap,
   onEdit,
   onToggleConfirm,
   onCastVote,
@@ -205,6 +207,7 @@ function DaySection({
   items: ItineraryItem[];
   userId: string;
   tripId: string;
+  legMap?: Map<string, number> | undefined;
   onEdit: (item: ItineraryItem) => void;
   onToggleConfirm: (itemId: string) => void;
   onCastVote: (itemId: string, vote: VoteType) => void;
@@ -246,10 +249,11 @@ function DaySection({
           {orderedItems.map((item) => {
             const nodeColor = NODE_COLORS[item.type] ?? "bg-[#A09B96]";
             const isDragged = draggingId === item.id;
+            const legKm = legMap?.get(item.id);
 
             return (
+              <div key={item.id}>
               <div
-                key={item.id}
                 ref={(el) => { itemRefs.current[item.id] = el; }}
                 className={`flex gap-4 transition-opacity duration-150 ${isDragged ? "opacity-40" : "opacity-100"}`}
               >
@@ -339,6 +343,16 @@ function DaySection({
                   </div>
                 </div>
               </div>
+              {legKm !== undefined && (
+                <div className="flex items-center gap-2 pl-10 py-1">
+                  <div className="flex-1 border-t border-dashed border-[#E5E0DA]" />
+                  <span className="text-[11px] font-semibold text-[#A09B96] font-mono flex-shrink-0">
+                    🚗 {legKm < 1 ? `${Math.round(legKm * 1000)} m` : `${legKm.toFixed(1)} km`}
+                  </span>
+                  <div className="flex-1 border-t border-dashed border-[#E5E0DA]" />
+                </div>
+              )}
+              </div>
             );
           })}
         </div>
@@ -349,7 +363,7 @@ function DaySection({
 
 // ── Main component ────────────────────────────────────────────────────────────
 
-export function ItineraryTimeline({ items, tripId, userId }: Props) {
+export function ItineraryTimeline({ items, tripId, userId, legMap }: Props) {
   const utils = api.useUtils();
   const [editItem, setEditItem] = useState<ItineraryItem | null>(null);
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
@@ -446,6 +460,7 @@ export function ItineraryTimeline({ items, tripId, userId }: Props) {
               items={dayItems}
               userId={userId}
               tripId={tripId}
+              legMap={legMap}
               onEdit={setEditItem}
               onToggleConfirm={(itemId) => toggleConfirmation.mutate({ itemId })}
               onCastVote={(itemId, vote) => castVote.mutate({ itemId, vote })}
