@@ -92,7 +92,7 @@ Beyond the base schema in `docs/DATABASE.md`:
 - [x] **Budget Tracking** — estimated vs actual cost, donut chart, "who paid" log, currency picker, member payer, user-set budget target, itinerary items auto-included
 - [x] **Map View** — Leaflet + Mapbox tiles, pins per item, tap pin → item detail sheet
 - [x] **Place Search** — debounced autocomplete (Mapbox Geocoding) on item add/edit, stores lat/lng for map pins
-- [ ] **Packing List** — shared + personal checklists per trip, swipe-to-check
+- [x] **Packing List** — shared + personal checklists per trip, tap-to-check, swipe-to-delete, grouped by category, progress bar
 - [ ] **Trip Templates** — save completed trip structure as reusable template
 - [ ] **Push Notifications** — Web Push for comments, votes, "trip starts tomorrow"
 

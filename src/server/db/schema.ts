@@ -213,6 +213,25 @@ export const tripExpenses = pgTable("trip_expenses", {
   index("trip_expenses_paid_by_idx").on(t.paidBy),
 ]);
 
+// ─── Packing List ─────────────────────────────────────────────────────────────
+
+export const packingItems = pgTable("packing_items", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  tripId: uuid("trip_id").notNull().references(() => trips.id, { onDelete: "cascade" }),
+  addedBy: text("added_by").notNull().references(() => users.id),
+  name: text("name").notNull(),
+  quantity: integer("quantity").default(1).notNull(),
+  category: text("category").default("general").notNull(),
+  isPersonal: boolean("is_personal").default(false).notNull(),
+  checked: boolean("checked").default(false).notNull(),
+  sortOrder: integer("sort_order").default(0).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().$onUpdate(() => new Date()).notNull(),
+}, (t) => [
+  index("packing_items_trip_id_idx").on(t.tripId),
+  index("packing_items_added_by_idx").on(t.addedBy),
+]);
+
 // ─── Comments ─────────────────────────────────────────────────────────────────
 
 export const tripComments = pgTable("trip_comments", {

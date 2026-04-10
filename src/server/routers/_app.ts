@@ -6,6 +6,7 @@ import { usersRouter } from "./users";
 import { commentsRouter } from "./comments";
 import { attachmentsRouter } from "./attachments";
 import { budgetRouter } from "./budget";
+import { packingRouter } from "./packing";
 
 export const appRouter = router({
   groups: groupsRouter,
@@ -15,6 +16,7 @@ export const appRouter = router({
   comments: commentsRouter,
   attachments: attachmentsRouter,
   budget: budgetRouter,
+  packing: packingRouter,
 });
 
 export type AppRouter = typeof appRouter;

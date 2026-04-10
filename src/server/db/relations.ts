@@ -13,6 +13,7 @@ import {
   attachments,
   userPresence,
   tripExpenses,
+  packingItems,
 } from "./schema";
 
 export const usersRelations = relations(users, ({ many }) => ({
@@ -45,6 +46,7 @@ export const tripsRelations = relations(trips, ({ one, many }) => ({
   attachments: many(attachments),
   presence: many(userPresence),
   expenses: many(tripExpenses),
+  packingItems: many(packingItems),
 }));
 
 export const itineraryItemsRelations = relations(itineraryItems, ({ one, many }) => ({
@@ -85,4 +87,9 @@ export const tripExpensesRelations = relations(tripExpenses, ({ one }) => ({
   trip: one(trips, { fields: [tripExpenses.tripId], references: [trips.id] }),
   payer: one(users, { fields: [tripExpenses.paidBy], references: [users.id] }),
   itineraryItem: one(itineraryItems, { fields: [tripExpenses.itineraryItemId], references: [itineraryItems.id] }),
+}));
+
+export const packingItemsRelations = relations(packingItems, ({ one }) => ({
+  trip: one(trips, { fields: [packingItems.tripId], references: [trips.id] }),
+  adder: one(users, { fields: [packingItems.addedBy], references: [users.id] }),
 }));

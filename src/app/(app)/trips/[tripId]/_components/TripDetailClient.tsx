@@ -14,6 +14,7 @@ import { AttachmentGallery } from "./AttachmentGallery";
 import { AttachmentUpload } from "./AttachmentUpload";
 import { BudgetTab } from "./BudgetTab";
 import { MapView } from "./MapView";
+import { PackingTab } from "./PackingTab";
 
 type RouterOutput = inferRouterOutputs<AppRouter>;
 type Trip = RouterOutput["trips"]["getById"];
@@ -132,7 +133,7 @@ function usePullToRefresh(onRefresh: () => Promise<void>) {
 
 export function TripDetailClient({ tripId, userId }: Props) {
   const router = useRouter();
-  const [tab, setTab] = useState<"overview" | "itinerary" | "budget" | "map" | "chat">("overview");
+  const [tab, setTab] = useState<"overview" | "itinerary" | "map" | "budget" | "pack" | "chat">("overview");
   const [addItemOpen, setAddItemOpen] = useState(false);
   const [mapSelectedId, setMapSelectedId] = useState<string | null>(null);
   const utils = api.useUtils();
@@ -248,6 +249,7 @@ export function TripDetailClient({ tripId, userId }: Props) {
             { id: "itinerary", label: "Plan" },
             { id: "map", label: "Map" },
             { id: "budget", label: "Budget" },
+            { id: "pack", label: "Pack" },
             { id: "chat", label: "Chat" },
           ] as const
         ).map(({ id, label }) => (
@@ -461,6 +463,10 @@ export function TripDetailClient({ tripId, userId }: Props) {
             budgetCents={trip.budgetCents}
             budgetCurrency={trip.budgetCurrency}
           />
+        )}
+
+        {tab === "pack" && (
+          <PackingTab tripId={trip.id} userId={userId} />
         )}
 
         {tab === "chat" && (
