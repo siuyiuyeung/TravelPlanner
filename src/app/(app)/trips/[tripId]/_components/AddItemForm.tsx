@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { api } from "@/lib/trpc/client";
+import { LocationAutocomplete } from "./LocationAutocomplete";
 
 type Props = {
   tripId: string;
@@ -31,24 +32,6 @@ export function AddItemForm({ tripId, onSuccess }: Props) {
   const [currency, setCurrency] = useState("HKD");
   const [description, setDescription] = useState("");
   const [error, setError] = useState("");
-
-  async function geocode(query: string) {
-    if (!query.trim()) return;
-    try {
-      const token = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
-      const res = await fetch(
-        `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(query)}.json?limit=1&access_token=${token}`
-      );
-      const data = await res.json() as { features: { center: [number, number] }[] };
-      const feature = data.features[0];
-      if (feature) {
-        setLocationLng(String(feature.center[0]));
-        setLocationLat(String(feature.center[1]));
-      }
-    } catch {
-      // ignore geocoding errors — location name still saved
-    }
-  }
 
   const utils = api.useUtils();
   const createItem = api.itinerary.create.useMutation({
@@ -142,17 +125,13 @@ export function AddItemForm({ tripId, onSuccess }: Props) {
 
         <div>
           <label className="block text-xs font-semibold text-[#6B6560] mb-1">Location</label>
-          <input
-            type="text"
+          <LocationAutocomplete
             value={location}
-            onChange={(e) => {
-              setLocation(e.target.value);
-              setLocationLat(undefined);
-              setLocationLng(undefined);
+            onChange={(val, lat, lng) => {
+              setLocation(val);
+              setLocationLat(lat);
+              setLocationLng(lng);
             }}
-            onBlur={(e) => geocode(e.target.value)}
-            placeholder="Search for a place..."
-            className="w-full px-4 py-3 bg-[#F0EDE8] border border-[#E5E0DA] rounded-[10px] text-[16px] text-[#1A1512] placeholder:text-[#A09B96] focus:outline-none focus:border-[#E8622A]"
           />
         </div>
 
