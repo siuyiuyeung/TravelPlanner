@@ -1,0 +1,2 @@
+ALTER TABLE "trip_expenses" ADD COLUMN "itinerary_item_id" uuid;--> statement-breakpoint
+ALTER TABLE "trip_expenses" ADD CONSTRAINT "trip_expenses_itinerary_item_id_itinerary_items_id_fk" FOREIGN KEY ("itinerary_item_id") REFERENCES "public"."itinerary_items"("id") ON DELETE set null ON UPDATE no action;

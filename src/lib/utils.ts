@@ -5,11 +5,11 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
-export function formatCurrency(cents: number, currency = "JPY"): string {
+export function formatCurrency(cents: number, currency = "HKD"): string {
   return new Intl.NumberFormat("en-US", {
     style: "currency",
     currency,
-    minimumFractionDigits: currency === "JPY" ? 0 : 2,
+    minimumFractionDigits: currency === "JPY" || currency === "CNY" ? 0 : 2,
   }).format(cents / 100);
 }
 

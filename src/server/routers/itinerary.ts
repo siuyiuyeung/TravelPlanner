@@ -1,7 +1,7 @@
 import { TRPCError } from "@trpc/server";
 import { eq, and, asc } from "drizzle-orm";
 import { router, protectedProcedure, z } from "../trpc";
-import { itineraryItems, itemConfirmations, trips, groupMembers } from "../db/schema";
+import { itineraryItems, itemConfirmations, itemVotes, trips, groupMembers } from "../db/schema";
 import { broadcastTripUpdate } from "../sse";
 
 const createItemSchema = z.object({
@@ -10,6 +10,8 @@ const createItemSchema = z.object({
   title: z.string().min(1).max(200),
   description: z.string().max(1000).optional(),
   locationName: z.string().max(300).optional(),
+  locationLat: z.string().max(30).optional(),
+  locationLng: z.string().max(30).optional(),
   startTime: z.string().datetime().optional(),
   endTime: z.string().datetime().optional(),
   costCents: z.number().int().min(0).optional(),
@@ -41,7 +43,7 @@ export const itineraryRouter = router({
       await assertTripMember(ctx.db as Parameters<typeof assertTripMember>[0], input.tripId, ctx.session.user.id);
       return ctx.db.query.itineraryItems.findMany({
         where: eq(itineraryItems.tripId, input.tripId),
-        with: { confirmations: { with: { user: true } } },
+        with: { confirmations: { with: { user: true } }, votes: true },
         orderBy: [asc(itineraryItems.sortOrder), asc(itineraryItems.startTime)],
       });
     }),
@@ -121,6 +123,45 @@ export const itineraryRouter = router({
         userId: ctx.session.user.id,
       });
       return { confirmed: true };
+    }),
+
+  castVote: protectedProcedure
+    .input(z.object({
+      itemId: z.string().uuid(),
+      vote: z.enum(["yes", "maybe", "no"]),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const item = await ctx.db.query.itineraryItems.findFirst({
+        where: eq(itineraryItems.id, input.itemId),
+      });
+      if (!item) throw new TRPCError({ code: "NOT_FOUND" });
+      await assertTripMember(ctx.db as Parameters<typeof assertTripMember>[0], item.tripId, ctx.session.user.id);
+
+      const existing = await ctx.db.query.itemVotes.findFirst({
+        where: and(
+          eq(itemVotes.itemId, input.itemId),
+          eq(itemVotes.userId, ctx.session.user.id),
+        ),
+      });
+
+      if (existing?.vote === input.vote) {
+        await ctx.db.delete(itemVotes).where(eq(itemVotes.id, existing.id));
+        broadcastTripUpdate(item.tripId);
+        return { vote: null };
+      }
+
+      if (existing) {
+        await ctx.db.update(itemVotes).set({ vote: input.vote }).where(eq(itemVotes.id, existing.id));
+      } else {
+        await ctx.db.insert(itemVotes).values({
+          itemId: input.itemId,
+          userId: ctx.session.user.id,
+          vote: input.vote,
+        });
+      }
+
+      broadcastTripUpdate(item.tripId);
+      return { vote: input.vote };
     }),
 
   reorder: protectedProcedure

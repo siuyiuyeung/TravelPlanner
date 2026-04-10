@@ -21,6 +21,8 @@ const updateTripSchema = z.object({
   endDate: z.string().optional(),
   status: z.enum(["planning", "active", "completed"]).optional(),
   coverImage: z.string().optional(),
+  budgetCents: z.number().int().min(0).optional(),
+  budgetCurrency: z.string().length(3).optional(),
 });
 
 function computedStatus(
@@ -62,7 +64,7 @@ export const tripsRouter = router({
         where: eq(trips.id, input.tripId),
         with: {
           group: { with: { members: { with: { user: true } } } },
-          itineraryItems: { with: { confirmations: { with: { user: true } } } },
+          itineraryItems: { with: { confirmations: { with: { user: true } }, votes: true } },
           comments: { with: { user: true } },
           attachments: true,
           presence: { with: { user: true } },

@@ -5,6 +5,8 @@ import { api } from "@/lib/trpc/client";
 import { BottomSheet, BottomSheetTitle } from "@/components/ui/bottom-sheet";
 import { EditItemForm } from "./EditItemForm";
 
+type VoteType = "yes" | "maybe" | "no";
+
 type ItineraryItem = {
   id: string;
   title: string;
@@ -12,10 +14,14 @@ type ItineraryItem = {
   startTime: Date | string | null;
   endTime: Date | string | null;
   locationName: string | null;
+  locationLat: string | null;
+  locationLng: string | null;
   costCents: number | null;
+  currency: string | null;
   description: string | null;
   sortOrder: number;
   confirmations: { userId: string }[];
+  votes: { userId: string; vote: VoteType }[];
 };
 
 type Props = {
@@ -153,6 +159,35 @@ function useDragReorder(
   };
 }
 
+// ── Vote tally bar ────────────────────────────────────────────────────────────
+
+function VoteTallyBar({ votes }: { votes: { vote: VoteType }[] }) {
+  const yes = votes.filter((v) => v.vote === "yes").length;
+  const maybe = votes.filter((v) => v.vote === "maybe").length;
+  const no = votes.filter((v) => v.vote === "no").length;
+  const total = votes.length;
+  if (total === 0) return null;
+
+  return (
+    <div className="flex items-center gap-1.5">
+      <div className="flex-1 flex rounded-full overflow-hidden h-1.5 bg-[#F0EDE8]">
+        {yes > 0 && (
+          <div className="bg-[#3D9970] h-full transition-all" style={{ width: `${(yes / total) * 100}%` }} />
+        )}
+        {maybe > 0 && (
+          <div className="bg-[#F2A93B] h-full transition-all" style={{ width: `${(maybe / total) * 100}%` }} />
+        )}
+        {no > 0 && (
+          <div className="bg-[#A09B96] h-full transition-all" style={{ width: `${(no / total) * 100}%` }} />
+        )}
+      </div>
+      <span className="text-[10px] text-[#A09B96] flex-shrink-0">
+        {yes}✓ {maybe}~ {no}✗
+      </span>
+    </div>
+  );
+}
+
 // ── Day section with drag ─────────────────────────────────────────────────────
 
 function DaySection({
@@ -163,6 +198,7 @@ function DaySection({
   tripId,
   onEdit,
   onToggleConfirm,
+  onCastVote,
 }: {
   dateStr: string;
   dayIndex: number;
@@ -171,6 +207,7 @@ function DaySection({
   tripId: string;
   onEdit: (item: ItineraryItem) => void;
   onToggleConfirm: (itemId: string) => void;
+  onCastVote: (itemId: string, vote: VoteType) => void;
 }) {
   const utils = api.useUtils();
   const reorder = api.itinerary.reorder.useMutation({
@@ -207,7 +244,6 @@ function DaySection({
 
         <div className="space-y-3">
           {orderedItems.map((item) => {
-            const confirmed = item.confirmations.some((c) => c.userId === userId);
             const nodeColor = NODE_COLORS[item.type] ?? "bg-[#A09B96]";
             const isDragged = draggingId === item.id;
 
@@ -270,33 +306,36 @@ function DaySection({
                   )}
 
                   <div
-                    className="flex items-center justify-between mt-2.5 pt-2.5 border-t border-[#F0EDE8]"
+                    className="flex flex-col gap-2 mt-2.5 pt-2.5 border-t border-[#F0EDE8]"
                     onClick={(e) => e.stopPropagation()}
                   >
-                    <div className="flex items-center gap-1">
-                      {item.confirmations.map((c, i) => (
-                        <div
-                          key={c.userId}
-                          className="w-5 h-5 rounded-full bg-[#3D9970] border border-white flex items-center justify-center text-[8px] text-white font-bold"
-                          style={{ marginLeft: i > 0 ? "-4px" : 0 }}
-                        >
-                          ✓
-                        </div>
-                      ))}
-                      <span className="text-[10px] text-[#A09B96] ml-1">
-                        {item.confirmations.length} confirmed
-                      </span>
+                    <VoteTallyBar votes={item.votes} />
+                    <div className="flex items-center gap-1.5">
+                      {(["yes", "maybe", "no"] as VoteType[]).map((v) => {
+                        const myVote = item.votes.find((vote) => vote.userId === userId)?.vote;
+                        const isActive = myVote === v;
+                        const count = item.votes.filter((vote) => vote.vote === v).length;
+                        const label = v === "yes" ? "👍" : v === "maybe" ? "🤔" : "👎";
+                        const activeStyle =
+                          v === "yes"
+                            ? "bg-[rgba(61,153,112,0.15)] text-[#3D9970] border-[rgba(61,153,112,0.3)]"
+                            : v === "maybe"
+                            ? "bg-[rgba(242,169,59,0.15)] text-[#B8860B] border-[rgba(242,169,59,0.3)]"
+                            : "bg-[rgba(160,155,150,0.15)] text-[#6B6560] border-[rgba(160,155,150,0.3)]";
+                        return (
+                          <button
+                            key={v}
+                            onClick={() => onCastVote(item.id, v)}
+                            className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-semibold border transition-colors ${
+                              isActive ? activeStyle : "bg-[#F0EDE8] text-[#6B6560] border-transparent"
+                            }`}
+                          >
+                            {label}
+                            {count > 0 && <span className="font-mono">{count}</span>}
+                          </button>
+                        );
+                      })}
                     </div>
-                    <button
-                      onClick={() => onToggleConfirm(item.id)}
-                      className={`text-[11px] font-semibold px-2.5 py-1 rounded-full transition-colors ${
-                        confirmed
-                          ? "bg-[rgba(61,153,112,0.15)] text-[#3D9970]"
-                          : "bg-[#F0EDE8] text-[#6B6560]"
-                      }`}
-                    >
-                      {confirmed ? "✓ Going" : "Going?"}
-                    </button>
                   </div>
                 </div>
               </div>
@@ -317,6 +356,9 @@ export function ItineraryTimeline({ items, tripId, userId }: Props) {
   const [activeDay, setActiveDay] = useState<string | null>(null); // null = All
 
   const toggleConfirmation = api.itinerary.toggleConfirmation.useMutation({
+    onSuccess: () => utils.trips.getById.invalidate({ tripId }),
+  });
+  const castVote = api.itinerary.castVote.useMutation({
     onSuccess: () => utils.trips.getById.invalidate({ tripId }),
   });
   const deleteItem = api.itinerary.delete.useMutation({
@@ -406,6 +448,7 @@ export function ItineraryTimeline({ items, tripId, userId }: Props) {
               tripId={tripId}
               onEdit={setEditItem}
               onToggleConfirm={(itemId) => toggleConfirmation.mutate({ itemId })}
+              onCastVote={(itemId, vote) => castVote.mutate({ itemId, vote })}
             />
           );
         })}

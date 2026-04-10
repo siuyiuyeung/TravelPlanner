@@ -25,9 +25,29 @@ export function AddItemForm({ tripId, onSuccess }: Props) {
   const [date, setDate] = useState("");
   const [time, setTime] = useState("");
   const [location, setLocation] = useState("");
+  const [locationLat, setLocationLat] = useState<string | undefined>();
+  const [locationLng, setLocationLng] = useState<string | undefined>();
   const [cost, setCost] = useState("");
+  const [currency, setCurrency] = useState("HKD");
   const [description, setDescription] = useState("");
   const [error, setError] = useState("");
+
+  async function geocode(query: string) {
+    if (!query.trim()) return;
+    try {
+      const res = await fetch(
+        `https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(query)}`,
+        { headers: { "Accept-Language": "en" } }
+      );
+      const data = await res.json() as { lat: string; lon: string }[];
+      if (data[0]) {
+        setLocationLat(data[0].lat);
+        setLocationLng(data[0].lon);
+      }
+    } catch {
+      // ignore geocoding errors — location name still saved
+    }
+  }
 
   const utils = api.useUtils();
   const createItem = api.itinerary.create.useMutation({
@@ -57,7 +77,10 @@ export function AddItemForm({ tripId, onSuccess }: Props) {
       title: title.trim(),
       startTime,
       locationName: location.trim() || undefined,
+      locationLat,
+      locationLng,
       costCents: costCents && !isNaN(costCents) ? costCents : undefined,
+      currency: cost ? currency : undefined,
       description: description.trim() || undefined,
     });
   }
@@ -121,24 +144,40 @@ export function AddItemForm({ tripId, onSuccess }: Props) {
           <input
             type="text"
             value={location}
-            onChange={(e) => setLocation(e.target.value)}
+            onChange={(e) => {
+              setLocation(e.target.value);
+              setLocationLat(undefined);
+              setLocationLng(undefined);
+            }}
+            onBlur={(e) => geocode(e.target.value)}
             placeholder="Search for a place..."
             className="w-full px-4 py-3 bg-[#F0EDE8] border border-[#E5E0DA] rounded-[10px] text-[16px] text-[#1A1512] placeholder:text-[#A09B96] focus:outline-none focus:border-[#E8622A]"
           />
         </div>
 
         <div>
-          <label className="block text-xs font-semibold text-[#6B6560] mb-1">Cost ($)</label>
-          <input
-            type="number"
-            inputMode="decimal"
-            value={cost}
-            onChange={(e) => setCost(e.target.value)}
-            placeholder="0.00"
-            min="0"
-            step="0.01"
-            className="w-full px-4 py-3 bg-[#F0EDE8] border border-[#E5E0DA] rounded-[10px] text-[16px] text-[#1A1512] placeholder:text-[#A09B96] focus:outline-none focus:border-[#E8622A]"
-          />
+          <label className="block text-xs font-semibold text-[#6B6560] mb-1">Cost</label>
+          <div className="flex gap-2">
+            <select
+              value={currency}
+              onChange={(e) => setCurrency(e.target.value)}
+              className="px-2.5 py-3 bg-[#F0EDE8] border border-[#E5E0DA] rounded-[10px] text-[15px] text-[#1A1512] focus:outline-none focus:border-[#E8622A] flex-shrink-0"
+            >
+              {["HKD","USD","EUR","GBP","JPY","CNY","AUD","CAD","CHF","INR","SGD","MXN"].map((c) => (
+                <option key={c} value={c}>{c}</option>
+              ))}
+            </select>
+            <input
+              type="number"
+              inputMode="decimal"
+              value={cost}
+              onChange={(e) => setCost(e.target.value)}
+              placeholder="0.00"
+              min="0"
+              step="0.01"
+              className="flex-1 px-4 py-3 bg-[#F0EDE8] border border-[#E5E0DA] rounded-[10px] text-[16px] text-[#1A1512] placeholder:text-[#A09B96] focus:outline-none focus:border-[#E8622A]"
+            />
+          </div>
         </div>
 
         <div>

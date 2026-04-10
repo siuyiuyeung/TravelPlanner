@@ -124,6 +124,8 @@ export const trips = pgTable("trips", {
   startDate: date("start_date"),
   endDate: date("end_date"),
   metadata: jsonb("metadata").default({}),
+  budgetCents: integer("budget_cents").default(0).notNull(),
+  budgetCurrency: char("budget_currency", { length: 3 }).default("HKD").notNull(),
   createdBy: text("created_by").notNull().references(() => users.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().$onUpdate(() => new Date()).notNull(),
@@ -160,6 +162,20 @@ export const itineraryItems = pgTable("itinerary_items", {
   index("itinerary_items_sort_order_idx").on(t.tripId, t.sortOrder),
 ]);
 
+export const voteTypeEnum = pgEnum("vote_type", ["yes", "maybe", "no"]);
+
+export const itemVotes = pgTable("item_votes", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  itemId: uuid("item_id").notNull().references(() => itineraryItems.id, { onDelete: "cascade" }),
+  userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  vote: voteTypeEnum("vote").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().$onUpdate(() => new Date()).notNull(),
+}, (t) => [
+  unique("item_votes_item_id_user_id_uniq").on(t.itemId, t.userId),
+  index("item_votes_item_id_idx").on(t.itemId),
+]);
+
 export const itemConfirmations = pgTable("item_confirmations", {
   id: uuid("id").defaultRandom().primaryKey(),
   itemId: uuid("item_id").notNull().references(() => itineraryItems.id, { onDelete: "cascade" }),
@@ -168,6 +184,33 @@ export const itemConfirmations = pgTable("item_confirmations", {
 }, (t) => [
   unique("item_confirmations_item_id_user_id_uniq").on(t.itemId, t.userId),
   index("item_confirmations_item_id_idx").on(t.itemId),
+]);
+
+// ─── Expenses ─────────────────────────────────────────────────────────────────
+
+export const expenseCategoryEnum = pgEnum("expense_category", [
+  "food",
+  "transport",
+  "accommodation",
+  "activity",
+  "other",
+]);
+
+export const tripExpenses = pgTable("trip_expenses", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  tripId: uuid("trip_id").notNull().references(() => trips.id, { onDelete: "cascade" }),
+  itineraryItemId: uuid("itinerary_item_id").references(() => itineraryItems.id, { onDelete: "set null" }),
+  paidBy: text("paid_by").notNull().references(() => users.id),
+  title: text("title").notNull(),
+  amountCents: integer("amount_cents").notNull(),
+  currency: char("currency", { length: 3 }).default("USD").notNull(),
+  category: expenseCategoryEnum("category").default("other").notNull(),
+  paidAt: timestamp("paid_at").defaultNow().notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().$onUpdate(() => new Date()).notNull(),
+}, (t) => [
+  index("trip_expenses_trip_id_idx").on(t.tripId),
+  index("trip_expenses_paid_by_idx").on(t.paidBy),
 ]);
 
 // ─── Comments ─────────────────────────────────────────────────────────────────

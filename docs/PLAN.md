@@ -88,9 +88,9 @@ Beyond the base schema in `docs/DATABASE.md`:
 
 ## v2 — High-Value Additions
 
-- [ ] **Voting / Polls** — yes/maybe/no per itinerary item, tally bar on card
-- [ ] **Budget Tracking** — estimated vs actual cost, donut chart, "who paid" log
-- [ ] **Map View** — Mapbox/Leaflet pins per day, tap pin → item detail sheet
+- [x] **Voting / Polls** — yes/maybe/no per itinerary item, tally bar on card
+- [x] **Budget Tracking** — estimated vs actual cost, donut chart, "who paid" log, currency picker, member payer, user-set budget target, itinerary items auto-included
+- [x] **Map View** — Leaflet pins per item, tap pin → item detail sheet, Nominatim geocoding on location input blur
 - [ ] **Place Search** — debounced autocomplete (Google Places or Nominatim) on item add
 - [ ] **Packing List** — shared + personal checklists per trip, swipe-to-check
 - [ ] **Trip Templates** — save completed trip structure as reusable template

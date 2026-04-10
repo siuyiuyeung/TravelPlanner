@@ -8,9 +8,11 @@ import {
   trips,
   itineraryItems,
   itemConfirmations,
+  itemVotes,
   tripComments,
   attachments,
   userPresence,
+  tripExpenses,
 } from "./schema";
 
 export const usersRelations = relations(users, ({ many }) => ({
@@ -42,18 +44,25 @@ export const tripsRelations = relations(trips, ({ one, many }) => ({
   comments: many(tripComments),
   attachments: many(attachments),
   presence: many(userPresence),
+  expenses: many(tripExpenses),
 }));
 
 export const itineraryItemsRelations = relations(itineraryItems, ({ one, many }) => ({
   trip: one(trips, { fields: [itineraryItems.tripId], references: [trips.id] }),
   creator: one(users, { fields: [itineraryItems.createdBy], references: [users.id] }),
   confirmations: many(itemConfirmations),
+  votes: many(itemVotes),
   attachments: many(attachments),
 }));
 
 export const itemConfirmationsRelations = relations(itemConfirmations, ({ one }) => ({
   item: one(itineraryItems, { fields: [itemConfirmations.itemId], references: [itineraryItems.id] }),
   user: one(users, { fields: [itemConfirmations.userId], references: [users.id] }),
+}));
+
+export const itemVotesRelations = relations(itemVotes, ({ one }) => ({
+  item: one(itineraryItems, { fields: [itemVotes.itemId], references: [itineraryItems.id] }),
+  user: one(users, { fields: [itemVotes.userId], references: [users.id] }),
 }));
 
 export const tripCommentsRelations = relations(tripComments, ({ one }) => ({
@@ -70,4 +79,10 @@ export const attachmentsRelations = relations(attachments, ({ one }) => ({
 export const userPresenceRelations = relations(userPresence, ({ one }) => ({
   user: one(users, { fields: [userPresence.userId], references: [users.id] }),
   trip: one(trips, { fields: [userPresence.tripId], references: [trips.id] }),
+}));
+
+export const tripExpensesRelations = relations(tripExpenses, ({ one }) => ({
+  trip: one(trips, { fields: [tripExpenses.tripId], references: [trips.id] }),
+  payer: one(users, { fields: [tripExpenses.paidBy], references: [users.id] }),
+  itineraryItem: one(itineraryItems, { fields: [tripExpenses.itineraryItemId], references: [itineraryItems.id] }),
 }));
