@@ -12,6 +12,8 @@ import { ItineraryTimeline } from "./ItineraryTimeline";
 import { CommentThread } from "./CommentThread";
 import { AttachmentGallery } from "./AttachmentGallery";
 import { AttachmentUpload } from "./AttachmentUpload";
+import { BudgetTab } from "./BudgetTab";
+import { MapView } from "./MapView";
 
 type RouterOutput = inferRouterOutputs<AppRouter>;
 type Trip = RouterOutput["trips"]["getById"];
@@ -130,8 +132,9 @@ function usePullToRefresh(onRefresh: () => Promise<void>) {
 
 export function TripDetailClient({ tripId, userId }: Props) {
   const router = useRouter();
-  const [tab, setTab] = useState<"overview" | "itinerary" | "chat">("overview");
+  const [tab, setTab] = useState<"overview" | "itinerary" | "budget" | "map" | "chat">("overview");
   const [addItemOpen, setAddItemOpen] = useState(false);
+  const [mapSelectedId, setMapSelectedId] = useState<string | null>(null);
   const utils = api.useUtils();
 
   const { data: trip, isLoading } = api.trips.getById.useQuery({ tripId });
@@ -239,23 +242,31 @@ export function TripDetailClient({ tripId, userId }: Props) {
 
       {/* Tab bar */}
       <div className="bg-white border-b border-[#E5E0DA] flex">
-        {(["overview", "itinerary", "chat"] as const).map((t) => (
+        {(
+          [
+            { id: "overview", label: "Home" },
+            { id: "itinerary", label: "Plan" },
+            { id: "map", label: "Map" },
+            { id: "budget", label: "Budget" },
+            { id: "chat", label: "Chat" },
+          ] as const
+        ).map(({ id, label }) => (
           <button
-            key={t}
-            onClick={() => setTab(t)}
-            className={`flex-1 py-3.5 text-sm font-semibold capitalize transition-colors ${
-              tab === t
+            key={id}
+            onClick={() => setTab(id)}
+            className={`flex-1 py-3 text-[11px] font-semibold transition-colors ${
+              tab === id
                 ? "text-[#E8622A] border-b-2 border-[#E8622A]"
                 : "text-[#A09B96]"
             }`}
           >
-            {t}
+            {label}
           </button>
         ))}
       </div>
 
       {/* Content */}
-      <div className={`flex-1 ${tab === "chat" ? "flex flex-col overflow-hidden pb-0" : "px-5 py-5 pb-24"}`}>
+      <div style={tab === "map" ? { flex: 1, display: "flex", flexDirection: "column", minHeight: 0, overflow: "hidden" } : undefined} className={tab === "map" ? "" : tab === "chat" ? "flex-1 flex flex-col overflow-hidden pb-0" : "flex-1 px-5 py-5 pb-28"}>
         {tab === "overview" && (
           <div className="space-y-4">
             {/* Quick stats */}
@@ -381,6 +392,74 @@ export function TripDetailClient({ tripId, userId }: Props) {
             items={trip.itineraryItems}
             tripId={trip.id}
             userId={userId}
+          />
+        )}
+
+        {tab === "map" && (
+          <>
+            <MapView
+              items={trip.itineraryItems}
+              onSelectItem={(id) => setMapSelectedId(id)}
+            />
+            <BottomSheet
+              open={mapSelectedId !== null}
+              onOpenChange={(open) => { if (!open) setMapSelectedId(null); }}
+            >
+              {(() => {
+                const item = trip.itineraryItems.find((i) => i.id === mapSelectedId);
+                if (!item) return null;
+                const emoji = ITEM_EMOJI[item.type] ?? "📌";
+                return (
+                  <div className="px-5 pb-8 space-y-3">
+                    <BottomSheetTitle>{emoji} {item.title}</BottomSheetTitle>
+                    {item.locationName && (
+                      <p className="text-sm text-[#6B6560]">📍 {item.locationName}</p>
+                    )}
+                    {item.startTime && (
+                      <p className="text-sm text-[#6B6560]">
+                        🕐{" "}
+                        {new Date(item.startTime).toLocaleString("en-US", {
+                          weekday: "short",
+                          month: "short",
+                          day: "numeric",
+                          hour: "numeric",
+                          minute: "2-digit",
+                        })}
+                      </p>
+                    )}
+                    {item.description && (
+                      <p className="text-sm text-[#1A1512]">{item.description}</p>
+                    )}
+                    {item.costCents != null && (
+                      <p className="text-sm text-[#1A1512]">
+                        💰 {new Intl.NumberFormat("en-US", { style: "currency", currency: item.currency ?? "HKD" }).format(item.costCents / 100)}
+                      </p>
+                    )}
+                    {item.url && (
+                      <a
+                        href={item.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="block text-sm text-[#E8622A] font-medium underline truncate"
+                      >
+                        {item.url}
+                      </a>
+                    )}
+                  </div>
+                );
+              })()}
+            </BottomSheet>
+          </>
+        )}
+
+        {tab === "budget" && (
+          <BudgetTab
+            tripId={trip.id}
+            userId={userId}
+            members={trip.group.members}
+            itineraryItems={trip.itineraryItems}
+            budgetCents={trip.budgetCents}
+            budgetCurrency={trip.budgetCurrency}
           />
         )}
 
