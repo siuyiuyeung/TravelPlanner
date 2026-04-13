@@ -279,13 +279,13 @@ function DaySection({
 
                 {/* Card */}
                 <div
-                  className={`flex-1 bg-white border rounded-[12px] p-3 shadow-[0_1px_3px_rgba(26,21,18,0.04)] active:scale-[0.99] transition-all cursor-pointer ${
+                  className={`flex-1 min-w-0 bg-white border rounded-[12px] p-3 shadow-[0_1px_3px_rgba(26,21,18,0.04)] active:scale-[0.99] transition-all cursor-pointer ${
                     isDragged ? "border-[#E8622A] shadow-[0_4px_12px_rgba(232,98,42,0.20)] scale-[1.01]" : "border-[#E5E0DA]"
                   }`}
                   onClick={() => onEdit(item)}
                 >
                   <div className="flex items-start justify-between gap-2">
-                    <p className="text-[14px] font-semibold text-[#1A1512]">{item.title}</p>
+                    <p className="text-[14px] font-semibold text-[#1A1512] break-words min-w-0">{item.title}</p>
                     <span className="text-[11px] text-[#A09B96] flex-shrink-0">Edit ›</span>
                   </div>
 
@@ -310,7 +310,7 @@ function DaySection({
                   </div>
 
                   {item.description && (
-                    <p className="text-xs text-[#A09B96] mt-1.5 line-clamp-2">{item.description}</p>
+                    <p className="text-xs text-[#A09B96] mt-1.5 line-clamp-2 break-words">{item.description}</p>
                   )}
 
                   <div
