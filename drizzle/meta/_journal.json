@@ -43,6 +43,13 @@
       "when": 1775812070182,
       "tag": "0005_cold_sasquatch",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1776059939165,
+      "tag": "0006_classy_omega_sentinel",
+      "breakpoints": true
     }
   ]
 }
