@@ -33,8 +33,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" className="h-full">
-      <body className="h-full bg-[#FAF8F5] antialiased" suppressHydrationWarning>
+    <html lang="en" className="h-full" suppressHydrationWarning>
+      <body className="h-full bg-[#FAF8F5] antialiased">
         <Providers>
           <ServiceWorkerRegistration />
           {children}
