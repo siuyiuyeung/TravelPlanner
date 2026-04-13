@@ -68,12 +68,14 @@ function SwipeableTripCard({
   gradientIndex,
   groupName,
   groupMembers,
+  canDelete,
   onDeleteRequest,
 }: {
   trip: { id: string; name: string; destination: string | null; status: string; startDate: string | null; endDate: string | null };
   gradientIndex: number;
   groupName: string;
   groupMembers: { user: { name: string } }[];
+  canDelete: boolean;
   onDeleteRequest: (tripId: string) => void;
 }) {
   const startX = useRef(0);
@@ -127,35 +129,49 @@ function SwipeableTripCard({
           // Tap elsewhere to dismiss
           <div className="absolute inset-0 z-10" onClick={dismissSwipe} />
         )}
-        <Link href={`/trips/${trip.id}`} onClick={(e) => { if (swiped) { e.preventDefault(); dismissSwipe(); } }}>
-          <div className="rounded-[16px] overflow-hidden">
-            <div className={`h-[120px] bg-gradient-to-br ${getGradient(gradientIndex)} p-3.5 flex flex-col justify-end`}>
-              <p className="text-[18px] font-bold text-white leading-tight">{trip.name}</p>
-              <p className="text-xs text-white/80 mt-0.5">
-                {trip.destination ? `📍 ${trip.destination}` : ""}
-                {trip.startDate ? ` · ${trip.startDate}` : ""}
-                {trip.endDate ? ` – ${trip.endDate}` : ""}
-              </p>
-            </div>
-            <div className="bg-white px-3.5 py-3 flex justify-between items-center">
-              <div className="flex flex-col gap-1">
-                <span className="text-[11px] text-[#A09B96] font-medium">{groupName}</span>
+        <Link
+          href={`/trips/${trip.id}`}
+          onClick={(e) => { if (swiped) { e.preventDefault(); dismissSwipe(); } }}
+          className="block rounded-[16px] overflow-hidden transition-shadow hover:shadow-[0_4px_16px_rgba(26,21,18,0.10)] active:scale-[0.99]"
+        >
+          <div className={`h-[120px] bg-gradient-to-br ${getGradient(gradientIndex)} p-3.5 flex flex-col justify-end`}>
+            <p className="text-[18px] font-bold text-white leading-tight">{trip.name}</p>
+            <p className="text-xs text-white/80 mt-0.5">
+              {trip.destination ? `📍 ${trip.destination}` : ""}
+              {trip.startDate ? ` · ${trip.startDate}` : ""}
+              {trip.endDate ? ` – ${trip.endDate}` : ""}
+            </p>
+          </div>
+          <div className="bg-white px-3.5 py-3 flex justify-between items-center">
+            <div className="flex flex-col gap-1">
+              <span className="text-[11px] text-[#A09B96] font-medium">{groupName}</span>
+              <span
+                className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold w-fit
+                  ${trip.status === "planning" ? "bg-[rgba(167,139,250,0.15)] text-[#A78BFA]" : ""}
+                  ${trip.status === "active" ? "bg-[rgba(61,153,112,0.15)] text-[#3D9970]" : ""}
+                `}
+              >
                 <span
-                  className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold w-fit
-                    ${trip.status === "planning" ? "bg-[rgba(167,139,250,0.15)] text-[#A78BFA]" : ""}
-                    ${trip.status === "active" ? "bg-[rgba(61,153,112,0.15)] text-[#3D9970]" : ""}
+                  className={`w-1.5 h-1.5 rounded-full
+                    ${trip.status === "planning" ? "bg-[#A78BFA]" : ""}
+                    ${trip.status === "active" ? "bg-[#3D9970]" : ""}
                   `}
-                >
-                  <span
-                    className={`w-1.5 h-1.5 rounded-full
-                      ${trip.status === "planning" ? "bg-[#A78BFA]" : ""}
-                      ${trip.status === "active" ? "bg-[#3D9970]" : ""}
-                    `}
-                  />
-                  {trip.status === "planning" ? "Planning" : "Active"}
-                </span>
-              </div>
+                />
+                {trip.status === "planning" ? "Planning" : "Active"}
+              </span>
+            </div>
+            <div className="flex items-center gap-2">
               <AvatarStack members={groupMembers} />
+              {canDelete && (
+                <button
+                  type="button"
+                  onClick={(e) => { e.preventDefault(); e.stopPropagation(); onDeleteRequest(trip.id); }}
+                  className="w-8 h-8 flex items-center justify-center rounded-full text-[#A09B96] hover:bg-[#F0EDE8] hover:text-[#E84040] transition-colors text-[18px] leading-none flex-shrink-0"
+                  aria-label="Trip options"
+                >
+                  ···
+                </button>
+              )}
             </div>
           </div>
         </Link>
@@ -219,8 +235,8 @@ export function DashboardClient({ session, groups }: Props) {
                 gradientIndex={i}
                 groupName={trip.group.name}
                 groupMembers={trip.group.members}
+                canDelete={trip.group.role !== "member"}
                 onDeleteRequest={(id) => {
-                  // Only owner/admin can delete
                   if (trip.group.role === "member") return;
                   setDeleteConfirmId(id);
                 }}

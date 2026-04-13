@@ -216,4 +216,42 @@ export const groupsRouter = router({
 
       return updated;
     }),
+
+  delete: protectedProcedure
+    .input(z.object({ groupId: z.string().uuid() }))
+    .mutation(async ({ ctx, input }) => {
+      const membership = await ctx.db.query.groupMembers.findFirst({
+        where: and(
+          eq(groupMembers.groupId, input.groupId),
+          eq(groupMembers.userId, ctx.session.user.id)
+        ),
+      });
+      if (!membership || membership.role !== "owner") {
+        throw new TRPCError({ code: "FORBIDDEN" });
+      }
+      await ctx.db.delete(groups).where(eq(groups.id, input.groupId));
+      return { success: true };
+    }),
+
+  leave: protectedProcedure
+    .input(z.object({ groupId: z.string().uuid() }))
+    .mutation(async ({ ctx, input }) => {
+      const membership = await ctx.db.query.groupMembers.findFirst({
+        where: and(
+          eq(groupMembers.groupId, input.groupId),
+          eq(groupMembers.userId, ctx.session.user.id)
+        ),
+      });
+      if (!membership) throw new TRPCError({ code: "NOT_FOUND" });
+      if (membership.role === "owner") {
+        throw new TRPCError({ code: "FORBIDDEN", message: "Owner cannot leave — delete the group instead" });
+      }
+      await ctx.db.delete(groupMembers).where(
+        and(
+          eq(groupMembers.groupId, input.groupId),
+          eq(groupMembers.userId, ctx.session.user.id)
+        )
+      );
+      return { success: true };
+    }),
 });
