@@ -93,8 +93,8 @@ export const groups = pgTable("groups", {
   avatarUrl: text("avatar_url"),
   inviteToken: text("invite_token").unique(),
   createdBy: text("created_by").notNull().references(() => users.id),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-  updatedAt: timestamp("updated_at").defaultNow().$onUpdate(() => new Date()).notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().$onUpdate(() => new Date()).notNull(),
 });
 
 export const groupMembers = pgTable("group_members", {
@@ -102,9 +102,9 @@ export const groupMembers = pgTable("group_members", {
   groupId: uuid("group_id").notNull().references(() => groups.id, { onDelete: "cascade" }),
   userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
   role: memberRoleEnum("role").default("member").notNull(),
-  joinedAt: timestamp("joined_at").defaultNow().notNull(),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-  updatedAt: timestamp("updated_at").defaultNow().$onUpdate(() => new Date()).notNull(),
+  joinedAt: timestamp("joined_at", { withTimezone: true }).defaultNow().notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().$onUpdate(() => new Date()).notNull(),
 }, (t) => [
   unique("group_members_group_id_user_id_uniq").on(t.groupId, t.userId),
   index("group_members_group_id_idx").on(t.groupId),
@@ -127,8 +127,8 @@ export const trips = pgTable("trips", {
   budgetCents: integer("budget_cents").default(0).notNull(),
   budgetCurrency: char("budget_currency", { length: 3 }).default("HKD").notNull(),
   createdBy: text("created_by").notNull().references(() => users.id),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-  updatedAt: timestamp("updated_at").defaultNow().$onUpdate(() => new Date()).notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().$onUpdate(() => new Date()).notNull(),
 }, (t) => [
   index("trips_group_id_idx").on(t.groupId),
   index("trips_status_idx").on(t.status),
@@ -154,8 +154,8 @@ export const itineraryItems = pgTable("itinerary_items", {
   metadata: jsonb("metadata").default({}),
   sortOrder: integer("sort_order").default(0).notNull(),
   createdBy: text("created_by").notNull().references(() => users.id),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-  updatedAt: timestamp("updated_at").defaultNow().$onUpdate(() => new Date()).notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().$onUpdate(() => new Date()).notNull(),
 }, (t) => [
   index("itinerary_items_trip_id_idx").on(t.tripId),
   index("itinerary_items_start_time_idx").on(t.startTime),
@@ -169,8 +169,8 @@ export const itemVotes = pgTable("item_votes", {
   itemId: uuid("item_id").notNull().references(() => itineraryItems.id, { onDelete: "cascade" }),
   userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
   vote: voteTypeEnum("vote").notNull(),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-  updatedAt: timestamp("updated_at").defaultNow().$onUpdate(() => new Date()).notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().$onUpdate(() => new Date()).notNull(),
 }, (t) => [
   unique("item_votes_item_id_user_id_uniq").on(t.itemId, t.userId),
   index("item_votes_item_id_idx").on(t.itemId),
@@ -180,7 +180,7 @@ export const itemConfirmations = pgTable("item_confirmations", {
   id: uuid("id").defaultRandom().primaryKey(),
   itemId: uuid("item_id").notNull().references(() => itineraryItems.id, { onDelete: "cascade" }),
   userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 }, (t) => [
   unique("item_confirmations_item_id_user_id_uniq").on(t.itemId, t.userId),
   index("item_confirmations_item_id_idx").on(t.itemId),
@@ -205,9 +205,9 @@ export const tripExpenses = pgTable("trip_expenses", {
   amountCents: integer("amount_cents").notNull(),
   currency: char("currency", { length: 3 }).default("USD").notNull(),
   category: expenseCategoryEnum("category").default("other").notNull(),
-  paidAt: timestamp("paid_at").defaultNow().notNull(),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-  updatedAt: timestamp("updated_at").defaultNow().$onUpdate(() => new Date()).notNull(),
+  paidAt: timestamp("paid_at", { withTimezone: true }).defaultNow().notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().$onUpdate(() => new Date()).notNull(),
 }, (t) => [
   index("trip_expenses_trip_id_idx").on(t.tripId),
   index("trip_expenses_paid_by_idx").on(t.paidBy),
@@ -225,8 +225,8 @@ export const packingItems = pgTable("packing_items", {
   isPersonal: boolean("is_personal").default(false).notNull(),
   checked: boolean("checked").default(false).notNull(),
   sortOrder: integer("sort_order").default(0).notNull(),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-  updatedAt: timestamp("updated_at").defaultNow().$onUpdate(() => new Date()).notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().$onUpdate(() => new Date()).notNull(),
 }, (t) => [
   index("packing_items_trip_id_idx").on(t.tripId),
   index("packing_items_added_by_idx").on(t.addedBy),
@@ -242,8 +242,8 @@ export const tripComments = pgTable("trip_comments", {
   parentId: uuid("parent_id"),                               // null = trip-level
   body: text("body").notNull(),
   reactions: jsonb("reactions").default({}), // { "👍": 2, "🎉": 1, ... }
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-  updatedAt: timestamp("updated_at").defaultNow().$onUpdate(() => new Date()).notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().$onUpdate(() => new Date()).notNull(),
 }, (t) => [
   index("trip_comments_trip_id_idx").on(t.tripId),
   index("trip_comments_parent_idx").on(t.parentType, t.parentId),
@@ -260,8 +260,8 @@ export const attachments = pgTable("attachments", {
   storagePath: text("storage_path").notNull(),
   mimeType: text("mime_type").notNull(),
   sizeBytes: integer("size_bytes").notNull(),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-  updatedAt: timestamp("updated_at").defaultNow().$onUpdate(() => new Date()).notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().$onUpdate(() => new Date()).notNull(),
 }, (t) => [
   index("attachments_trip_id_idx").on(t.tripId),
 ]);
@@ -272,7 +272,7 @@ export const userPresence = pgTable("user_presence", {
   id: uuid("id").defaultRandom().primaryKey(),
   userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
   tripId: uuid("trip_id").notNull().references(() => trips.id, { onDelete: "cascade" }),
-  lastSeenAt: timestamp("last_seen_at").defaultNow().notNull(),
+  lastSeenAt: timestamp("last_seen_at", { withTimezone: true }).defaultNow().notNull(),
 }, (t) => [
   unique("user_presence_user_id_trip_id_uniq").on(t.userId, t.tripId),
   index("user_presence_trip_id_idx").on(t.tripId),

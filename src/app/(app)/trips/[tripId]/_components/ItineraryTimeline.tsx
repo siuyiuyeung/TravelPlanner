@@ -51,7 +51,11 @@ const NODE_COLORS: Record<string, string> = {
 
 function toDateKey(startTime: Date | string | null): string {
   if (!startTime) return "";
-  return new Date(startTime).toISOString().slice(0, 10);
+  const d = new Date(startTime);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
 }
 
 function groupByDate(items: ItineraryItem[]) {

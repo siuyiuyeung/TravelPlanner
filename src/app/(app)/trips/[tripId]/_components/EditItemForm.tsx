@@ -38,7 +38,11 @@ type ItemType = (typeof ITEM_TYPES)[number]["value"];
 
 function toDateInput(dt: Date | string | null): string {
   if (!dt) return "";
-  return new Date(dt).toISOString().slice(0, 10);
+  const d = new Date(dt);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
 }
 
 function toTimeInput(dt: Date | string | null): string {
