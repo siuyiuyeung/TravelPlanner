@@ -40,4 +40,5 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
-uploads/.claude/settings.local.json
+uploads/
+.claude/settings.local.json
