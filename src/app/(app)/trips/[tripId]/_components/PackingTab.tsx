@@ -270,27 +270,29 @@ export function PackingTab({ tripId, userId }: Props) {
       <AddItemRow tripId={tripId} onAdded={() => {}} />
 
       {/* Progress + filter */}
-      {totalCount > 0 && (
+      {items.length > 0 && (
         <div className="space-y-2.5">
-          {/* Progress bar */}
-          <div className="bg-white border border-[#E5E0DA] rounded-[12px] px-4 py-3">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-[13px] font-semibold text-[#1A1512]">
-                {checkedCount} / {totalCount} packed
-              </span>
-              <span className="text-[12px] text-[#A09B96]">
-                {totalCount > 0 ? Math.round((checkedCount / totalCount) * 100) : 0}%
-              </span>
+          {/* Progress bar — only when current filter has items */}
+          {totalCount > 0 && (
+            <div className="bg-white border border-[#E5E0DA] rounded-[12px] px-4 py-3">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-[13px] font-semibold text-[#1A1512]">
+                  {checkedCount} / {totalCount} packed
+                </span>
+                <span className="text-[12px] text-[#A09B96]">
+                  {Math.round((checkedCount / totalCount) * 100)}%
+                </span>
+              </div>
+              <div className="h-2 bg-[#F0EDE8] rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-[#3D9970] rounded-full transition-all duration-300"
+                  style={{ width: `${(checkedCount / totalCount) * 100}%` }}
+                />
+              </div>
             </div>
-            <div className="h-2 bg-[#F0EDE8] rounded-full overflow-hidden">
-              <div
-                className="h-full bg-[#3D9970] rounded-full transition-all duration-300"
-                style={{ width: `${totalCount > 0 ? (checkedCount / totalCount) * 100 : 0}%` }}
-              />
-            </div>
-          </div>
+          )}
 
-          {/* Filter pills */}
+          {/* Filter pills — always visible while any items exist */}
           <div className="flex gap-2">
             {(["all", "shared", "mine"] as const).map((f) => (
               <button
