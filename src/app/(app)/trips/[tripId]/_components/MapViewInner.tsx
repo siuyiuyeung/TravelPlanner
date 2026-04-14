@@ -26,8 +26,8 @@ const ITEM_EMOJI: Record<string, string> = {
   flight: "✈️",
   hotel: "🏨",
   restaurant: "🍜",
-  activity: "🎭",
-  transport: "🚌",
+  activity: "🎡",
+  transport: "🚗",
   note: "📝",
 };
 

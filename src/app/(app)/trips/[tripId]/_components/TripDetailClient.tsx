@@ -133,10 +133,18 @@ function usePullToRefresh(onRefresh: () => Promise<void>) {
 
 const MAPBOX_TOKEN = process.env.NEXT_PUBLIC_MAPBOX_TOKEN ?? "";
 
+type RouteMode = "driving" | "walking" | "cycling" | "transit";
+
+const MAPBOX_PROFILE: Record<RouteMode, string> = {
+  driving: "driving",
+  walking: "walking",
+  cycling: "cycling",
+  transit: "driving", // Mapbox free tier has no transit profile; driving is the closest proxy
+};
+
 type RouteData = {
   coords: [number, number][];
   totalKm: number;
-  legKms: number[];
 };
 
 export function TripDetailClient({ tripId, userId }: Props) {
@@ -145,6 +153,8 @@ export function TripDetailClient({ tripId, userId }: Props) {
   const [addItemOpen, setAddItemOpen] = useState(false);
   const [mapSelectedId, setMapSelectedId] = useState<string | null>(null);
   const [routeData, setRouteData] = useState<RouteData | null>(null);
+  const [legModes, setLegModes] = useState<Record<string, RouteMode>>({});
+  const [legDistances, setLegDistances] = useState<Record<string, number>>({});
   const utils = api.useUtils();
 
   const { data: trip, isLoading } = api.trips.getById.useQuery({ tripId });
@@ -184,15 +194,24 @@ export function TripDetailClient({ tripId, userId }: Props) {
     return () => es.close();
   }, [tripId, utils]);
 
-  // Fetch driving route once when located items are known
-  const pinnedItems = (trip?.itineraryItems ?? []).filter(
-    (i) => i.locationLat !== null && i.locationLng !== null
-  );
+  // Sort pinned items the same way the plan view does (startTime → sortOrder)
+  const pinnedItems = [...(trip?.itineraryItems ?? [])]
+    .sort((a, b) => {
+      const aTime = a.startTime ? new Date(a.startTime).getTime() : null;
+      const bTime = b.startTime ? new Date(b.startTime).getTime() : null;
+      if (aTime && bTime) return aTime - bTime || a.sortOrder - b.sortOrder;
+      if (aTime) return -1;
+      if (bTime) return 1;
+      return a.sortOrder - b.sortOrder;
+    })
+    .filter((i) => i.locationLat !== null && i.locationLng !== null);
   const posKey = pinnedItems.map((i) => `${i.locationLat},${i.locationLng}`).join("|");
 
   useEffect(() => {
     if (pinnedItems.length < 2) {
       setRouteData(null);
+      setLegDistances({});
+      setLegModes({});
       return;
     }
     const coordStr = pinnedItems.map((i) => `${i.locationLng},${i.locationLat}`).join(";");
@@ -206,19 +225,45 @@ export function TripDetailClient({ tripId, userId }: Props) {
         setRouteData({
           coords: route.geometry.coordinates.map(([lng, lat]) => [lat, lng]),
           totalKm: route.distance / 1000,
-          legKms: route.legs.map((l) => l.distance / 1000),
         });
+        const distances: Record<string, number> = {};
+        const modes: Record<string, RouteMode> = {};
+        pinnedItems.slice(0, -1).forEach((item, i) => {
+          distances[item.id] = (route.legs[i]?.distance ?? 0) / 1000;
+          modes[item.id] = "driving";
+        });
+        setLegDistances(distances);
+        setLegModes(modes);
       })
-      .catch(() => setRouteData(null));
+      .catch(() => {
+        setRouteData(null);
+        setLegDistances({});
+        setLegModes({});
+      });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [posKey]);
 
-  // Build leg distance map: itemId → km to the next pinned item
-  const legMap = new Map<string, number>();
-  pinnedItems.forEach((item, i) => {
-    const km = routeData?.legKms[i];
-    if (km !== undefined) legMap.set(item.id, km);
-  });
+  const handleLegModeChange = useCallback(async (itemId: string, mode: RouteMode) => {
+    setLegModes((prev) => ({ ...prev, [itemId]: mode }));
+    const idx = pinnedItems.findIndex((i) => i.id === itemId);
+    if (idx === -1 || idx >= pinnedItems.length - 1) return;
+    const from = pinnedItems[idx]!;
+    const to = pinnedItems[idx + 1]!;
+    const coordStr = `${from.locationLng},${from.locationLat};${to.locationLng},${to.locationLat}`;
+    const profile = MAPBOX_PROFILE[mode];
+    try {
+      const r = await fetch(
+        `https://api.mapbox.com/directions/v5/mapbox/${profile}/${coordStr}?geometries=geojson&overview=false&access_token=${MAPBOX_TOKEN}`
+      );
+      const data = (await r.json()) as { routes?: { legs: { distance: number }[] }[] };
+      const dist = data.routes?.[0]?.legs?.[0]?.distance;
+      if (dist !== undefined) {
+        setLegDistances((prev) => ({ ...prev, [itemId]: dist / 1000 }));
+      }
+    } catch {
+      // keep existing distance on error
+    }
+  }, [pinnedItems]);
 
   // Pull-to-refresh
   const handleRefresh = useCallback(async () => {
@@ -249,7 +294,7 @@ export function TripDetailClient({ tripId, userId }: Props) {
     .find((i) => new Date(i.startTime!) >= now);
 
   const ITEM_EMOJI: Record<string, string> = {
-    flight: "✈️", hotel: "🏨", restaurant: "🍜", activity: "🎭", transport: "🚌", note: "📝",
+    flight: "✈️", hotel: "🏨", restaurant: "🍜", activity: "🎡", transport: "🚗", note: "📝",
   };
 
   return (
@@ -439,7 +484,9 @@ export function TripDetailClient({ tripId, userId }: Props) {
             items={trip.itineraryItems}
             tripId={trip.id}
             userId={userId}
-            legMap={legMap}
+            legDistances={legDistances}
+            legModes={legModes}
+            onLegModeChange={handleLegModeChange}
           />
         )}
 

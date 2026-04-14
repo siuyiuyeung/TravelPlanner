@@ -13,8 +13,8 @@ const ITEM_TYPES = [
   { value: "flight", emoji: "✈️", label: "Flight" },
   { value: "hotel", emoji: "🏨", label: "Hotel" },
   { value: "restaurant", emoji: "🍜", label: "Food" },
-  { value: "activity", emoji: "🎭", label: "Activity" },
-  { value: "transport", emoji: "🚌", label: "Transport" },
+  { value: "activity", emoji: "🎡", label: "Activity" },
+  { value: "transport", emoji: "🚗", label: "Transport" },
   { value: "note", emoji: "📝", label: "Note" },
 ] as const;
 

@@ -38,7 +38,7 @@
 
 ### 4. Itinerary Builder
 - [x] Day-by-day timeline view (sticky day headers with JetBrains Mono stamps)
-- [x] Add item via FAB → bottom sheet (types: flight / hotel / restaurant / activity / transport / note)
+- [x] Add item via FAB → bottom sheet (types: flight / hotel / restaurant / activity / transport / note) — icons updated: activity 🎡, transport 🚗
 - [x] Edit / delete itinerary item
 - [x] Drag-to-reorder within a day
 - [x] Item confirmation (tap to confirm, avatar stack showing who confirmed)
@@ -114,6 +114,8 @@ Beyond the base schema in `docs/DATABASE.md`:
 - [x] Route distance — two display locations from the same Directions API call:
   - **Map tab**: floating pill overlay (bottom-left, above attribution) showing total route km
   - **Plan tab**: small connector row between consecutive located items showing per-leg distance (e.g. "🚗 12.4 km") — only shown between items that both have a location
+- [x] Map pin sequence fixed — pinnedItems sorted by startTime then sortOrder to match plan view order
+- [x] Transport mode picker in Plan tab (Drive / Walk / Cycle / Transit) — refetches Mapbox Directions on change; connector icon updates per mode
 
 ### 4. Place Search
 - [x] Debounced autocomplete (Mapbox Geocoding API v5) in Add / Edit item forms
