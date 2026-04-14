@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { api } from "@/lib/trpc/client";
@@ -155,6 +155,7 @@ export function TripDetailClient({ tripId, userId }: Props) {
   const [routeData, setRouteData] = useState<RouteData | null>(null);
   const [legModes, setLegModes] = useState<Record<string, RouteMode>>({});
   const [legDistances, setLegDistances] = useState<Record<string, number>>({});
+  const [legCoords, setLegCoords] = useState<Record<string, [number, number][]>>({});
   const utils = api.useUtils();
 
   const { data: trip, isLoading } = api.trips.getById.useQuery({ tripId });
@@ -212,34 +213,46 @@ export function TripDetailClient({ tripId, userId }: Props) {
       setRouteData(null);
       setLegDistances({});
       setLegModes({});
+      setLegCoords({});
       return;
     }
-    const coordStr = pinnedItems.map((i) => `${i.locationLng},${i.locationLat}`).join(";");
-    fetch(
-      `https://api.mapbox.com/directions/v5/mapbox/driving/${coordStr}?geometries=geojson&overview=full&access_token=${MAPBOX_TOKEN}`
-    )
-      .then((r) => r.json())
-      .then((data: { routes?: { distance: number; geometry: { coordinates: [number, number][] }; legs: { distance: number }[] }[] }) => {
+    const legs = pinnedItems.slice(0, -1);
+    Promise.all(
+      legs.map(async (item, i) => {
+        const from = item;
+        const to = pinnedItems[i + 1]!;
+        const coordStr = `${from.locationLng},${from.locationLat};${to.locationLng},${to.locationLat}`;
+        const r = await fetch(
+          `https://api.mapbox.com/directions/v5/mapbox/driving/${coordStr}?geometries=geojson&overview=full&access_token=${MAPBOX_TOKEN}`
+        );
+        const data = (await r.json()) as { routes?: { distance: number; geometry: { coordinates: [number, number][] } }[] };
         const route = data.routes?.[0];
-        if (!route) return;
-        setRouteData({
-          coords: route.geometry.coordinates.map(([lng, lat]) => [lat, lng]),
-          totalKm: route.distance / 1000,
-        });
-        const distances: Record<string, number> = {};
-        const modes: Record<string, RouteMode> = {};
-        pinnedItems.slice(0, -1).forEach((item, i) => {
-          distances[item.id] = (route.legs[i]?.distance ?? 0) / 1000;
-          modes[item.id] = "driving";
-        });
-        setLegDistances(distances);
-        setLegModes(modes);
+        return { id: item.id, distance: route?.distance ?? 0, coords: route?.geometry.coordinates ?? [] };
       })
-      .catch(() => {
-        setRouteData(null);
-        setLegDistances({});
-        setLegModes({});
+    ).then((results) => {
+      const distances: Record<string, number> = {};
+      const modes: Record<string, RouteMode> = {};
+      const coords: Record<string, [number, number][]> = {};
+      let totalKm = 0;
+      results.forEach((r) => {
+        distances[r.id] = r.distance / 1000;
+        modes[r.id] = "driving";
+        coords[r.id] = r.coords.map(([lng, lat]) => [lat, lng] as [number, number]);
+        totalKm += r.distance / 1000;
       });
+      setLegDistances(distances);
+      setLegModes(modes);
+      setLegCoords(coords);
+      setRouteData({
+        coords: results.flatMap((r) => r.coords.map(([lng, lat]) => [lat, lng] as [number, number])),
+        totalKm,
+      });
+    }).catch(() => {
+      setRouteData(null);
+      setLegDistances({});
+      setLegModes({});
+      setLegCoords({});
+    });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [posKey]);
 
@@ -253,17 +266,30 @@ export function TripDetailClient({ tripId, userId }: Props) {
     const profile = MAPBOX_PROFILE[mode];
     try {
       const r = await fetch(
-        `https://api.mapbox.com/directions/v5/mapbox/${profile}/${coordStr}?geometries=geojson&overview=false&access_token=${MAPBOX_TOKEN}`
+        `https://api.mapbox.com/directions/v5/mapbox/${profile}/${coordStr}?geometries=geojson&overview=full&access_token=${MAPBOX_TOKEN}`
       );
-      const data = (await r.json()) as { routes?: { legs: { distance: number }[] }[] };
-      const dist = data.routes?.[0]?.legs?.[0]?.distance;
-      if (dist !== undefined) {
-        setLegDistances((prev) => ({ ...prev, [itemId]: dist / 1000 }));
+      const data = (await r.json()) as { routes?: { distance: number; geometry: { coordinates: [number, number][] } }[] };
+      const route = data.routes?.[0];
+      if (route) {
+        setLegDistances((prev) => ({ ...prev, [itemId]: route.distance / 1000 }));
+        setLegCoords((prev) => ({
+          ...prev,
+          [itemId]: route.geometry.coordinates.map(([lng, lat]) => [lat, lng] as [number, number]),
+        }));
       }
     } catch {
-      // keep existing distance on error
+      // keep existing values on error
     }
   }, [pinnedItems]);
+
+  // Stitch per-leg geometries into one polyline for the map
+  const combinedPolyline = useMemo(() => {
+    if (pinnedItems.length < 2) return [];
+    const legs = pinnedItems.slice(0, -1);
+    const allPresent = legs.every((item) => (legCoords[item.id]?.length ?? 0) > 0);
+    if (allPresent) return legs.flatMap((item) => legCoords[item.id] ?? []);
+    return routeData?.coords ?? [];
+  }, [pinnedItems, legCoords, routeData]);
 
   // Pull-to-refresh
   const handleRefresh = useCallback(async () => {
@@ -495,8 +521,8 @@ export function TripDetailClient({ tripId, userId }: Props) {
             <MapView
               items={trip.itineraryItems}
               onSelectItem={(id) => setMapSelectedId(id)}
-              routeCoords={routeData?.coords ?? []}
-              totalKm={routeData?.totalKm}
+              routeCoords={combinedPolyline}
+              totalKm={Object.values(legDistances).reduce((s, km) => s + km, 0) || routeData?.totalKm}
             />
             <BottomSheet
               open={mapSelectedId !== null}
