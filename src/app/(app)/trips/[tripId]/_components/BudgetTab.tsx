@@ -457,7 +457,7 @@ export function BudgetTab({ tripId, userId, members, itineraryItems, budgetCents
               </div>
             </div>
 
-            <div className="flex-1 space-y-1.5">
+            <div className="flex-1 min-w-0 space-y-1.5">
               {breakdown.length === 0 ? (
                 <p className="text-[13px] text-[#A09B96]">No expenses yet</p>
               ) : isMixed ? (
@@ -467,9 +467,9 @@ export function BudgetTab({ tripId, userId, members, itineraryItems, budgetCents
                     .filter((e) => e.currency === cur)
                     .reduce((s, e) => s + e.amountCents, 0);
                   return (
-                    <div key={cur} className="flex items-center justify-between">
-                      <span className="text-[12px] text-[#6B6560]">{cur}</span>
-                      <span className="text-[12px] font-semibold text-[#1A1512]">
+                    <div key={cur} className="flex items-center justify-between gap-1">
+                      <span className="text-[12px] text-[#6B6560] truncate">{cur}</span>
+                      <span className="text-[12px] font-semibold text-[#1A1512] flex-shrink-0">
                         {formatCurrency(curTotal, cur)}
                       </span>
                     </div>
@@ -481,11 +481,11 @@ export function BudgetTab({ tripId, userId, members, itineraryItems, budgetCents
                   const meta = CATEGORY_META[category];
                   const pct = totalForDonut > 0 ? Math.round((amount / totalForDonut) * 100) : 0;
                   return (
-                    <div key={category} className="flex items-center gap-2">
-                      <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: meta.color }} />
-                      <span className="text-[12px] text-[#6B6560] flex-1">{meta.label}</span>
-                      <span className="text-[12px] font-semibold text-[#1A1512]">{formatCurrency(amount, singleCurrency)}</span>
-                      <span className="text-[10px] text-[#A09B96] w-7 text-right">{pct}%</span>
+                    <div key={category} className="flex items-center gap-1.5">
+                      <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: meta.color }} />
+                      <span className="text-[12px] text-[#6B6560] flex-1 truncate">{meta.label}</span>
+                      <span className="text-[11px] font-semibold text-[#1A1512] flex-shrink-0">{formatCurrency(amount, singleCurrency)}</span>
+                      <span className="text-[10px] text-[#A09B96] w-6 text-right flex-shrink-0">{pct}%</span>
                     </div>
                   );
                 })
