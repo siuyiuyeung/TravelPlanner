@@ -441,9 +441,9 @@ export function BudgetTab({ tripId, userId, members, itineraryItems, budgetCents
             </div>
           )}
 
-          {/* Donut + legend */}
-          <div className="flex items-center gap-5">
-            <div className="relative flex-shrink-0">
+          {/* Donut centred */}
+          <div className="flex justify-center mb-4">
+            <div className="relative">
               <DonutChart segments={breakdown} total={totalForDonut} />
               <div className="absolute inset-0 flex flex-col items-center justify-center">
                 <span className="text-[11px] text-[#A09B96]">spent</span>
@@ -456,54 +456,53 @@ export function BudgetTab({ tripId, userId, members, itineraryItems, budgetCents
                 )}
               </div>
             </div>
+          </div>
 
-            <div className="flex-1 min-w-0 space-y-1.5">
-              {breakdown.length === 0 ? (
-                <p className="text-[13px] text-[#A09B96]">No expenses yet</p>
-              ) : isMixed ? (
-                // Per-currency subtotals
-                uniqueCurrencies.map((cur) => {
-                  const curTotal = expenses
-                    .filter((e) => e.currency === cur)
-                    .reduce((s, e) => s + e.amountCents, 0);
-                  return (
-                    <div key={cur} className="flex items-center justify-between gap-1">
-                      <span className="text-[12px] text-[#6B6560] truncate">{cur}</span>
-                      <span className="text-[12px] font-semibold text-[#1A1512] flex-shrink-0">
-                        {formatCurrency(curTotal, cur)}
-                      </span>
-                    </div>
-                  );
-                })
-              ) : (
-                // Category breakdown
-                breakdown.map(({ category, amount }) => {
-                  const meta = CATEGORY_META[category];
-                  const pct = totalForDonut > 0 ? Math.round((amount / totalForDonut) * 100) : 0;
-                  return (
-                    <div key={category} className="flex items-center gap-1.5">
-                      <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: meta.color }} />
-                      <span className="text-[12px] text-[#6B6560] flex-1 truncate">{meta.label}</span>
-                      <span className="text-[11px] font-semibold text-[#1A1512] flex-shrink-0">{formatCurrency(amount, singleCurrency)}</span>
-                      <span className="text-[10px] text-[#A09B96] w-6 text-right flex-shrink-0">{pct}%</span>
-                    </div>
-                  );
-                })
-              )}
-
-              {/* vs budget delta */}
-              {budgetCents > 0 && !isMixed && (
-                <div className="pt-1 mt-1 border-t border-[#F0EDE8]">
-                  <div className="flex items-center justify-between">
-                    <span className="text-[11px] text-[#A09B96]">vs budget</span>
-                    <span className={`text-[11px] font-semibold ${actualCents > budgetCents ? "text-[#E84040]" : "text-[#3D9970]"}`}>
-                      {actualCents > budgetCents ? "+" : ""}
-                      {formatCurrency(actualCents - budgetCents, singleCurrency)}
+          {/* Legend — full width so nothing overflows */}
+          <div className="space-y-1.5">
+            {breakdown.length === 0 ? (
+              <p className="text-[13px] text-[#A09B96] text-center">No expenses yet</p>
+            ) : isMixed ? (
+              uniqueCurrencies.map((cur) => {
+                const curTotal = expenses
+                  .filter((e) => e.currency === cur)
+                  .reduce((s, e) => s + e.amountCents, 0);
+                return (
+                  <div key={cur} className="flex items-center justify-between">
+                    <span className="text-[12px] text-[#6B6560]">{cur}</span>
+                    <span className="text-[12px] font-semibold text-[#1A1512]">
+                      {formatCurrency(curTotal, cur)}
                     </span>
                   </div>
+                );
+              })
+            ) : (
+              breakdown.map(({ category, amount }) => {
+                const meta = CATEGORY_META[category];
+                const pct = totalForDonut > 0 ? Math.round((amount / totalForDonut) * 100) : 0;
+                return (
+                  <div key={category} className="flex items-center gap-2">
+                    <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: meta.color }} />
+                    <span className="text-[12px] text-[#6B6560] flex-1">{meta.label}</span>
+                    <span className="text-[12px] font-semibold text-[#1A1512] flex-shrink-0">{formatCurrency(amount, singleCurrency)}</span>
+                    <span className="text-[10px] text-[#A09B96] w-7 text-right flex-shrink-0">{pct}%</span>
+                  </div>
+                );
+              })
+            )}
+
+            {/* vs budget delta */}
+            {budgetCents > 0 && !isMixed && (
+              <div className="pt-1 mt-1 border-t border-[#F0EDE8]">
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] text-[#A09B96]">vs budget</span>
+                  <span className={`text-[11px] font-semibold ${actualCents > budgetCents ? "text-[#E84040]" : "text-[#3D9970]"}`}>
+                    {actualCents > budgetCents ? "+" : ""}
+                    {formatCurrency(actualCents - budgetCents, singleCurrency)}
+                  </span>
                 </div>
-              )}
-            </div>
+              </div>
+            )}
           </div>
         </div>
 
