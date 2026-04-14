@@ -349,9 +349,33 @@ export function BudgetTab({ tripId, userId, members, itineraryItems, budgetCents
   // ── Currency detection ─────────────────────────────────────────────────────
 
   const actualCents = expenses.reduce((s, e) => s + e.amountCents, 0);
-  const uniqueCurrencies = [...new Set(expenses.map((e) => e.currency))];
+  const allUsedCurrencies = [
+    ...expenses.map((e) => e.currency),
+    ...itineraryItems.filter((i) => (i.costCents ?? 0) > 0).map((i) => i.currency ?? "HKD"),
+  ];
+  const uniqueCurrencies = [...new Set(allUsedCurrencies)];
   const isMixed = uniqueCurrencies.length > 1;
   const singleCurrency = uniqueCurrencies[0] ?? budgetCurrency;
+
+  // Per-currency breakdown used when isMixed — never mixes units
+  const currencyBreakdown = uniqueCurrencies.map((cur) => {
+    const curExpenses = expenses.filter((e) => e.currency === cur);
+    const curItems = itineraryItems.filter(
+      (i) => (i.costCents ?? 0) > 0 && (i.currency ?? "HKD") === cur
+    );
+    const total =
+      curExpenses.reduce((s, e) => s + e.amountCents, 0) +
+      curItems.reduce((s, i) => s + (i.costCents ?? 0), 0);
+    const cats = CATEGORIES.map((cat) => ({
+      category: cat,
+      amount:
+        curExpenses.filter((e) => e.category === cat).reduce((s, e) => s + e.amountCents, 0) +
+        curItems
+          .filter((i) => (ITEM_TYPE_TO_CATEGORY[i.type] ?? "other") === cat)
+          .reduce((s, i) => s + (i.costCents ?? 0), 0),
+    })).filter((c) => c.amount > 0);
+    return { currency: cur, total, cats };
+  });
 
   function timeAgo(d: Date | string) {
     const mins = Math.floor((Date.now() - new Date(d).getTime()) / 60_000);
@@ -441,69 +465,96 @@ export function BudgetTab({ tripId, userId, members, itineraryItems, budgetCents
             </div>
           )}
 
-          {/* Donut centred */}
-          <div className="flex justify-center mb-4">
-            <div className="relative">
-              <DonutChart segments={breakdown} total={totalForDonut} />
-              <div className="absolute inset-0 flex flex-col items-center justify-center">
-                <span className="text-[11px] text-[#A09B96]">spent</span>
-                {isMixed ? (
-                  <span className="text-[13px] font-bold text-[#1A1512]">mixed</span>
-                ) : (
-                  <span className="text-[15px] font-bold text-[#1A1512]">
-                    {formatCurrency(actualCents, singleCurrency)}
-                  </span>
-                )}
-              </div>
-            </div>
-          </div>
-
-          {/* Legend — full width so nothing overflows */}
-          <div className="space-y-1.5">
-            {breakdown.length === 0 ? (
-              <p className="text-[13px] text-[#A09B96] text-center">No expenses yet</p>
-            ) : isMixed ? (
-              uniqueCurrencies.map((cur) => {
-                const curTotal = expenses
-                  .filter((e) => e.currency === cur)
-                  .reduce((s, e) => s + e.amountCents, 0);
-                return (
-                  <div key={cur} className="flex items-center justify-between">
-                    <span className="text-[12px] text-[#6B6560]">{cur}</span>
-                    <span className="text-[12px] font-semibold text-[#1A1512]">
-                      {formatCurrency(curTotal, cur)}
+          {/* Single-currency: donut + category legend */}
+          {!isMixed && (
+            <>
+              <div className="flex justify-center mb-4">
+                <div className="relative">
+                  <DonutChart segments={breakdown} total={totalForDonut} />
+                  <div className="absolute inset-0 flex flex-col items-center justify-center">
+                    <span className="text-[11px] text-[#A09B96]">spent</span>
+                    <span className="text-[15px] font-bold text-[#1A1512]">
+                      {formatCurrency(actualCents, singleCurrency)}
                     </span>
                   </div>
-                );
-              })
-            ) : (
-              breakdown.map(({ category, amount }) => {
-                const meta = CATEGORY_META[category];
-                const pct = totalForDonut > 0 ? Math.round((amount / totalForDonut) * 100) : 0;
-                return (
-                  <div key={category} className="flex items-center gap-2">
-                    <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: meta.color }} />
-                    <span className="text-[12px] text-[#6B6560] flex-1">{meta.label}</span>
-                    <span className="text-[12px] font-semibold text-[#1A1512] flex-shrink-0">{formatCurrency(amount, singleCurrency)}</span>
-                    <span className="text-[10px] text-[#A09B96] w-7 text-right flex-shrink-0">{pct}%</span>
-                  </div>
-                );
-              })
-            )}
-
-            {/* vs budget delta */}
-            {budgetCents > 0 && !isMixed && (
-              <div className="pt-1 mt-1 border-t border-[#F0EDE8]">
-                <div className="flex items-center justify-between">
-                  <span className="text-[11px] text-[#A09B96]">vs budget</span>
-                  <span className={`text-[11px] font-semibold ${actualCents > budgetCents ? "text-[#E84040]" : "text-[#3D9970]"}`}>
-                    {actualCents > budgetCents ? "+" : ""}
-                    {formatCurrency(actualCents - budgetCents, singleCurrency)}
-                  </span>
                 </div>
               </div>
-            )}
-          </div>
+              <div className="space-y-1.5">
+                {breakdown.length === 0 ? (
+                  <p className="text-[13px] text-[#A09B96] text-center">No expenses yet</p>
+                ) : (
+                  breakdown.map(({ category, amount }) => {
+                    const meta = CATEGORY_META[category];
+                    const pct = totalForDonut > 0 ? Math.round((amount / totalForDonut) * 100) : 0;
+                    return (
+                      <div key={category} className="flex items-center gap-2">
+                        <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: meta.color }} />
+                        <span className="text-[12px] text-[#6B6560] flex-1">{meta.label}</span>
+                        <span className="text-[12px] font-semibold text-[#1A1512] flex-shrink-0">{formatCurrency(amount, singleCurrency)}</span>
+                        <span className="text-[10px] text-[#A09B96] w-7 text-right flex-shrink-0">{pct}%</span>
+                      </div>
+                    );
+                  })
+                )}
+                {budgetCents > 0 && (
+                  <div className="pt-1 mt-1 border-t border-[#F0EDE8]">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[11px] text-[#A09B96]">vs budget</span>
+                      <span className={`text-[11px] font-semibold ${actualCents > budgetCents ? "text-[#E84040]" : "text-[#3D9970]"}`}>
+                        {actualCents > budgetCents ? "+" : ""}
+                        {formatCurrency(actualCents - budgetCents, singleCurrency)}
+                      </span>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </>
+          )}
+
+          {/* Mixed-currency: per-currency stacked bar + category rows */}
+          {isMixed && (
+            <div className="space-y-4">
+              {currencyBreakdown.map(({ currency: cur, total, cats }, idx) => (
+                <div key={cur}>
+                  {idx > 0 && <div className="border-t border-[#F0EDE8] pt-4" />}
+                  {/* Currency header */}
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-[13px] font-semibold text-[#6B6560]">{cur}</span>
+                    <span className="text-[15px] font-bold text-[#1A1512]">{formatCurrency(total, cur)}</span>
+                  </div>
+                  {/* Stacked bar — proportions within this currency only */}
+                  {cats.length > 0 && (
+                    <div className="h-1.5 bg-[#F0EDE8] rounded-full overflow-hidden flex mb-2.5">
+                      {cats.map(({ category, amount }) => (
+                        <div
+                          key={category}
+                          style={{
+                            width: `${(amount / total) * 100}%`,
+                            backgroundColor: CATEGORY_META[category].color,
+                          }}
+                        />
+                      ))}
+                    </div>
+                  )}
+                  {/* Category rows */}
+                  <div className="space-y-1.5">
+                    {cats.map(({ category, amount }) => {
+                      const meta = CATEGORY_META[category];
+                      const pct = Math.round((amount / total) * 100);
+                      return (
+                        <div key={category} className="flex items-center gap-2">
+                          <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: meta.color }} />
+                          <span className="text-[12px] text-[#6B6560] flex-1">{meta.label}</span>
+                          <span className="text-[12px] font-semibold text-[#1A1512] flex-shrink-0">{formatCurrency(amount, cur)}</span>
+                          <span className="text-[10px] text-[#A09B96] w-7 text-right flex-shrink-0">{pct}%</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* Add expense button */}

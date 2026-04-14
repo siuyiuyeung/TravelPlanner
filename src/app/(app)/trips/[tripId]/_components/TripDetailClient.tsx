@@ -7,6 +7,7 @@ import { api } from "@/lib/trpc/client";
 import type { AppRouter } from "@/server/routers/_app";
 import type { inferRouterOutputs } from "@trpc/server";
 import { BottomSheet, BottomSheetTitle } from "@/components/ui/bottom-sheet";
+import { formatCurrency } from "@/lib/utils";
 import { AddItemForm } from "./AddItemForm";
 import { ItineraryTimeline } from "./ItineraryTimeline";
 import { CommentThread } from "./CommentThread";
@@ -313,6 +314,23 @@ export function TripDetailClient({ tripId, userId }: Props) {
 
   const gradient = getGradient(trip.id);
 
+  const costItems = trip.itineraryItems.filter((i) => (i.costCents ?? 0) > 0);
+  const allSameCurrency = costItems.every((i) => i.currency === costItems[0]?.currency);
+  const totalCostCents = costItems.reduce((s, i) => s + (i.costCents ?? 0), 0);
+  const costStat =
+    costItems.length === 0
+      ? "—"
+      : allSameCurrency
+      ? formatCurrency(totalCostCents, costItems[0]!.currency ?? "USD")
+      : "mixed";
+  const totalDistKm = Object.values(legDistances).reduce((s, km) => s + km, 0);
+  const distStat =
+    totalDistKm === 0
+      ? "—"
+      : totalDistKm < 1
+      ? `${Math.round(totalDistKm * 1000)} m`
+      : `${totalDistKm.toFixed(1)} km`;
+
   const now = new Date();
   const nextItem = trip.itineraryItems
     .filter((i) => i.startTime != null)
@@ -397,6 +415,20 @@ export function TripDetailClient({ tripId, userId }: Props) {
                 <div key={label} className="bg-white border border-[#E5E0DA] rounded-[12px] p-3 text-center">
                   <p className="text-xl">{icon}</p>
                   <p className="text-[18px] font-bold text-[#1A1512] mt-1">{value}</p>
+                  <p className="text-[11px] text-[#A09B96]">{label}</p>
+                </div>
+              ))}
+            </div>
+
+            {/* Cost + Distance stats */}
+            <div className="grid grid-cols-2 gap-3">
+              {[
+                { icon: "💰", label: "Total Cost", value: costStat },
+                { icon: "📏", label: "Distance", value: distStat },
+              ].map(({ icon, label, value }) => (
+                <div key={label} className="bg-white border border-[#E5E0DA] rounded-[12px] p-3 text-center">
+                  <p className="text-xl">{icon}</p>
+                  <p className="text-[15px] font-bold text-[#1A1512] mt-1 truncate">{value}</p>
                   <p className="text-[11px] text-[#A09B96]">{label}</p>
                 </div>
               ))}
