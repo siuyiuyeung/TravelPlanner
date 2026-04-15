@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useLayoutEffect } from "react";
 import { api } from "@/lib/trpc/client";
 import { BottomSheet, BottomSheetTitle } from "@/components/ui/bottom-sheet";
 import { EditItemForm } from "./EditItemForm";
@@ -159,7 +159,9 @@ function useSwipeReorder({
   const [dragDy, setDragDy] = useState(0);
   const internal = useRef({ startY: 0, active: false, currentDy: 0 });
   const cbs = useRef({ onMoveUp, onMoveDown, canMoveUp, canMoveDown });
-  cbs.current = { onMoveUp, onMoveDown, canMoveUp, canMoveDown };
+  useLayoutEffect(() => {
+    cbs.current = { onMoveUp, onMoveDown, canMoveUp, canMoveDown };
+  });
 
   useEffect(() => {
     const el = handleRef.current;
@@ -213,7 +215,6 @@ function ItemCard({
   idx,
   total,
   userId,
-  tripId,
   legDistances,
   legModes,
   onLegModeChange,
@@ -225,7 +226,6 @@ function ItemCard({
   idx: number;
   total: number;
   userId: string;
-  tripId: string;
   legDistances?: Record<string, number> | undefined;
   legModes?: Record<string, RouteMode> | undefined;
   onLegModeChange?: ((itemId: string, mode: RouteMode) => void) | undefined;
@@ -436,12 +436,12 @@ function DaySection({
 
   const [order, setOrder] = useState<string[]>(items.map((i) => i.id));
 
-  // Sync with server data when items change externally
-  const latestInitial = useRef(items.map((i) => i.id));
-  const newInitial = items.map((i) => i.id);
-  if (JSON.stringify(latestInitial.current) !== JSON.stringify(newInitial)) {
-    latestInitial.current = newInitial;
-    setOrder(newInitial);
+  // Sync with server data when items change externally (derived-state pattern)
+  const [prevItemKey, setPrevItemKey] = useState(() => items.map((i) => i.id).join(","));
+  const newItemKey = items.map((i) => i.id).join(",");
+  if (prevItemKey !== newItemKey) {
+    setPrevItemKey(newItemKey);
+    setOrder(items.map((i) => i.id));
   }
 
   function move(id: string, dir: -1 | 1) {
@@ -480,7 +480,6 @@ function DaySection({
               idx={idx}
               total={orderedItems.length}
               userId={userId}
-              tripId={tripId}
               legDistances={legDistances}
               legModes={legModes}
               onLegModeChange={onLegModeChange}
@@ -606,7 +605,7 @@ export function ItineraryTimeline({ items, tripId, userId, legDistances, legMode
               setEditItem(null);
               utils.trips.getById.invalidate({ tripId });
             }}
-            onDelete={() => setDeleteConfirmId(editItem.id)}
+            onDelete={() => { setEditItem(null); setDeleteConfirmId(editItem.id); }}
           />
         )}
       </BottomSheet>

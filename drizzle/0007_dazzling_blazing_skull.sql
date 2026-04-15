@@ -1,0 +1,1 @@
+ALTER TABLE "itinerary_items" ADD COLUMN "route_mode" text DEFAULT 'driving' NOT NULL;

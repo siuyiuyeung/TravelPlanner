@@ -152,6 +152,7 @@ export const itineraryItems = pgTable("itinerary_items", {
   currency: char("currency", { length: 3 }),
   url: text("url"),
   metadata: jsonb("metadata").default({}),
+  routeMode: text("route_mode").default("driving").notNull(),
   sortOrder: integer("sort_order").default(0).notNull(),
   createdBy: text("created_by").notNull().references(() => users.id),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),

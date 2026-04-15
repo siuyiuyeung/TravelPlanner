@@ -19,7 +19,7 @@ export function BottomSheet({ open, onOpenChange, children }: BottomSheetProps) 
             "fixed bottom-0 left-0 right-0 z-50",
             "bg-white rounded-t-[24px]",
             "shadow-[0_-8px_40px_rgba(26,21,18,0.18)]",
-            "max-h-[85vh] flex flex-col",
+            "max-h-[85vh] flex flex-col overflow-hidden",
             "focus:outline-none"
           )}
           aria-describedby={undefined}
@@ -43,7 +43,7 @@ export function BottomSheetTitle({
   className?: string;
 }) {
   return (
-    <Drawer.Title className={cn("text-[17px] font-bold text-[#1A1512] px-5 pb-4", className)}>
+    <Drawer.Title className={cn("text-[17px] font-bold text-[#1A1512] px-5 pb-4 flex-shrink-0", className)}>
       {children}
     </Drawer.Title>
   );

@@ -97,7 +97,7 @@ export function EditItemForm({ item, onSuccess, onDelete }: Props) {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto px-5 pb-8">
+    <form onSubmit={handleSubmit} className="flex-1 min-h-0 overflow-y-auto px-5 pb-8">
       {/* Type picker */}
       <div className="grid grid-cols-3 gap-2 mb-5">
         {ITEM_TYPES.map((t) => (

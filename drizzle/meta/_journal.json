@@ -50,6 +50,13 @@
       "when": 1776059939165,
       "tag": "0006_classy_omega_sentinel",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1776225048664,
+      "tag": "0007_dazzling_blazing_skull",
+      "breakpoints": true
     }
   ]
 }

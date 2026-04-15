@@ -136,6 +136,7 @@ const MAPBOX_TOKEN = process.env.NEXT_PUBLIC_MAPBOX_TOKEN ?? "";
 
 type RouteMode = "driving" | "walking" | "cycling" | "transit";
 
+
 const MAPBOX_PROFILE: Record<RouteMode, string> = {
   driving: "driving",
   walking: "walking",
@@ -164,6 +165,7 @@ export function TripDetailClient({ tripId, userId }: Props) {
 
   const pingPresence = api.trips.pingPresence.useMutation();
   const leavePresence = api.trips.leavePresence.useMutation();
+  const updateItem = api.itinerary.update.useMutation();
 
   // Ping presence on mount, every 30s, and clean up on unmount
   useEffect(() => {
@@ -223,12 +225,14 @@ export function TripDetailClient({ tripId, userId }: Props) {
         const from = item;
         const to = pinnedItems[i + 1]!;
         const coordStr = `${from.locationLng},${from.locationLat};${to.locationLng},${to.locationLat}`;
+        const itemMode = (item.routeMode ?? "driving") as RouteMode;
+        const profile = MAPBOX_PROFILE[itemMode];
         const r = await fetch(
-          `https://api.mapbox.com/directions/v5/mapbox/driving/${coordStr}?geometries=geojson&overview=full&access_token=${MAPBOX_TOKEN}`
+          `https://api.mapbox.com/directions/v5/mapbox/${profile}/${coordStr}?geometries=geojson&overview=full&access_token=${MAPBOX_TOKEN}`
         );
         const data = (await r.json()) as { routes?: { distance: number; geometry: { coordinates: [number, number][] } }[] };
         const route = data.routes?.[0];
-        return { id: item.id, distance: route?.distance ?? 0, coords: route?.geometry.coordinates ?? [] };
+        return { id: item.id, mode: itemMode, distance: route?.distance ?? 0, coords: route?.geometry.coordinates ?? [] };
       })
     ).then((results) => {
       const distances: Record<string, number> = {};
@@ -237,7 +241,7 @@ export function TripDetailClient({ tripId, userId }: Props) {
       let totalKm = 0;
       results.forEach((r) => {
         distances[r.id] = r.distance / 1000;
-        modes[r.id] = "driving";
+        modes[r.id] = r.mode;
         coords[r.id] = r.coords.map(([lng, lat]) => [lat, lng] as [number, number]);
         totalKm += r.distance / 1000;
       });
@@ -259,6 +263,7 @@ export function TripDetailClient({ tripId, userId }: Props) {
 
   const handleLegModeChange = useCallback(async (itemId: string, mode: RouteMode) => {
     setLegModes((prev) => ({ ...prev, [itemId]: mode }));
+    updateItem.mutate({ itemId, tripId, routeMode: mode });
     const idx = pinnedItems.findIndex((i) => i.id === itemId);
     if (idx === -1 || idx >= pinnedItems.length - 1) return;
     const from = pinnedItems[idx]!;
@@ -281,6 +286,7 @@ export function TripDetailClient({ tripId, userId }: Props) {
     } catch {
       // keep existing values on error
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pinnedItems]);
 
   // Stitch per-leg geometries into one polyline for the map

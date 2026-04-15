@@ -18,6 +18,7 @@ const createItemSchema = z.object({
   currency: z.string().length(3).optional(),
   url: z.string().url().optional(),
   sortOrder: z.number().int().default(0),
+  routeMode: z.enum(["driving", "walking", "cycling", "transit"]).optional(),
 });
 
 async function assertTripMember(
