@@ -92,7 +92,21 @@ export function GroupDetailClient({ group: initialGroup }: Props) {
     : `/join/${token}`;
 
   async function copyInvite() {
-    await navigator.clipboard.writeText(`${window.location.origin}/join/${token}`);
+    const text = `${window.location.origin}/join/${token}`;
+    try {
+      await navigator.clipboard.writeText(text);
+    } catch {
+      // Fallback for non-secure contexts or permission denied
+      const el = document.createElement("textarea");
+      el.value = text;
+      el.style.position = "fixed";
+      el.style.opacity = "0";
+      document.body.appendChild(el);
+      el.focus();
+      el.select();
+      document.execCommand("copy");
+      document.body.removeChild(el);
+    }
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   }
