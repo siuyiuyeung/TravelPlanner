@@ -2,8 +2,9 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState, useRef } from "react";
+import { useState } from "react";
 import { api } from "@/lib/trpc/client";
+import { useSwipeToDelete } from "@/hooks/use-swipe-to-delete";
 
 type Member = {
   userId: string;
@@ -31,6 +32,47 @@ type Group = {
 
 type Props = { group: Group };
 
+function SwipeableMemberRow({
+  member,
+  canRemove,
+  onRemove,
+}: {
+  member: Member;
+  canRemove: boolean;
+  onRemove: () => void;
+}) {
+  const { swiped, onTouchStart, onTouchEnd } = useSwipeToDelete();
+  const colors = ["bg-[#E8622A]", "bg-[#2D6A8F]", "bg-[#3D9970]", "bg-[#A78BFA]"];
+  const colorIndex = member.userId.charCodeAt(0) % colors.length;
+
+  return (
+    <div className="relative overflow-hidden rounded-[12px]">
+      {canRemove && (
+        <div className="absolute inset-y-0 right-0 w-20 bg-[#E84040] flex flex-col items-center justify-center rounded-r-[12px]">
+          <button onClick={onRemove} className="flex flex-col items-center gap-1">
+            <span className="text-white text-xl">🗑</span>
+            <span className="text-white text-[10px] font-semibold">Remove</span>
+          </button>
+        </div>
+      )}
+      <div
+        onTouchStart={canRemove ? onTouchStart : undefined}
+        onTouchEnd={canRemove ? onTouchEnd : undefined}
+        style={canRemove ? { transform: swiped ? "translateX(-80px)" : "translateX(0)", transition: "transform 0.2s ease" } : undefined}
+        className="bg-white border border-[#E5E0DA] rounded-[12px] p-3 flex items-center gap-3"
+      >
+        <div className={`w-9 h-9 rounded-full flex items-center justify-center text-[13px] font-bold text-white ${colors[colorIndex]}`}>
+          {member.user.name.charAt(0).toUpperCase()}
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="text-[14px] font-semibold text-[#1A1512] truncate">{member.user.name}</p>
+        </div>
+        <span className="text-[11px] font-medium text-[#A09B96] capitalize">{member.role}</span>
+      </div>
+    </div>
+  );
+}
+
 const STATUS_STYLES: Record<string, { bg: string; text: string; dot: string; label: string }> = {
   planning: { bg: "bg-[rgba(167,139,250,0.15)]", text: "text-[#A78BFA]", dot: "bg-[#A78BFA]", label: "Planning" },
   active: { bg: "bg-[rgba(61,153,112,0.15)]", text: "text-[#3D9970]", dot: "bg-[#3D9970]", label: "Active" },
@@ -39,14 +81,9 @@ const STATUS_STYLES: Record<string, { bg: string; text: string; dot: string; lab
 
 export function GroupDetailClient({ group: initialGroup }: Props) {
   const router = useRouter();
-  const utils = api.useUtils();
-
   const [group, setGroup] = useState(initialGroup);
   const [copied, setCopied] = useState(false);
-  const [contextMember, setContextMember] = useState<Member | null>(null);
   const [removedUserIds, setRemovedUserIds] = useState<Set<string>>(new Set());
-
-  const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const token = group.inviteToken ?? "";
   const inviteLink = typeof window !== "undefined"
@@ -65,35 +102,13 @@ export function GroupDetailClient({ group: initialGroup }: Props) {
     },
   });
 
-  const updateRole = api.groups.updateMemberRole.useMutation({
-    onSuccess: () => {
-      utils.groups.getById.invalidate({ groupId: group.id });
-      setContextMember(null);
-    },
-  });
-
   const removeMember = api.groups.removeMember.useMutation({
     onSuccess: (_, vars) => {
       setRemovedUserIds((prev) => new Set([...prev, vars.targetUserId]));
-      setContextMember(null);
     },
   });
 
   const isOwnerOrAdmin = group.role === "owner" || group.role === "admin";
-
-  function handleMemberLongPress(member: Member) {
-    if (!isOwnerOrAdmin) return;
-    if (member.role === "owner") return;
-    if (navigator.vibrate) navigator.vibrate(10);
-    setContextMember(member);
-  }
-
-  function startLongPress(member: Member) {
-    longPressTimer.current = setTimeout(() => handleMemberLongPress(member), 400);
-  }
-  function cancelLongPress() {
-    if (longPressTimer.current) clearTimeout(longPressTimer.current);
-  }
 
   const visibleMembers = group.members.filter((m) => !removedUserIds.has(m.userId));
 
@@ -142,35 +157,16 @@ export function GroupDetailClient({ group: initialGroup }: Props) {
 
       {/* Members */}
       <section className="mb-6">
-        <h2 className="text-[17px] font-bold text-[#1A1512] mb-1">Members</h2>
-        {isOwnerOrAdmin && (
-          <p className="text-[11px] text-[#A09B96] mb-3">Hold a member to manage their role</p>
-        )}
+        <h2 className="text-[17px] font-bold text-[#1A1512] mb-3">Members</h2>
         <div className="space-y-2">
-          {visibleMembers.map((m) => {
-            const colors = ["bg-[#E8622A]", "bg-[#2D6A8F]", "bg-[#3D9970]", "bg-[#A78BFA]"];
-            const colorIndex = m.userId.charCodeAt(0) % colors.length;
-            return (
-              <div
-                key={m.userId}
-                className="bg-white border border-[#E5E0DA] rounded-[12px] p-3 flex items-center gap-3 select-none"
-                onTouchStart={() => startLongPress(m)}
-                onTouchEnd={cancelLongPress}
-                onTouchMove={cancelLongPress}
-                onMouseDown={() => startLongPress(m)}
-                onMouseUp={cancelLongPress}
-                onMouseLeave={cancelLongPress}
-              >
-                <div className={`w-9 h-9 rounded-full flex items-center justify-center text-[13px] font-bold text-white ${colors[colorIndex]}`}>
-                  {m.user.name.charAt(0).toUpperCase()}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-[14px] font-semibold text-[#1A1512] truncate">{m.user.name}</p>
-                </div>
-                <span className="text-[11px] font-medium text-[#A09B96] capitalize">{m.role}</span>
-              </div>
-            );
-          })}
+          {visibleMembers.map((m) => (
+            <SwipeableMemberRow
+              key={m.userId}
+              member={m}
+              canRemove={isOwnerOrAdmin && m.role !== "owner"}
+              onRemove={() => removeMember.mutate({ groupId: group.id, targetUserId: m.userId })}
+            />
+          ))}
         </div>
       </section>
 
@@ -207,50 +203,6 @@ export function GroupDetailClient({ group: initialGroup }: Props) {
         )}
       </section>
 
-      {/* Member context menu */}
-      {contextMember && (
-        <div className="fixed inset-0 z-50 flex items-end">
-          <div className="absolute inset-0 bg-[#1A1512]/40" onClick={() => setContextMember(null)} />
-          <div className="relative w-full bg-white rounded-t-[24px] p-5 pb-10">
-            <div className="w-9 h-1 rounded-full bg-[#E5E0DA] mx-auto mb-5" />
-            <p className="text-[15px] font-bold text-[#1A1512] mb-1">{contextMember.user.name}</p>
-            <p className="text-[12px] text-[#A09B96] mb-5 capitalize">Current role: {contextMember.role}</p>
-            <div className="space-y-2">
-              {contextMember.role === "member" && (
-                <button
-                  onClick={() => updateRole.mutate({ groupId: group.id, targetUserId: contextMember.userId, role: "admin" })}
-                  disabled={updateRole.isPending}
-                  className="w-full py-3.5 bg-[#F0EDE8] text-[#1A1512] font-semibold text-[14px] rounded-[12px] disabled:opacity-50"
-                >
-                  Make admin
-                </button>
-              )}
-              {contextMember.role === "admin" && (
-                <button
-                  onClick={() => updateRole.mutate({ groupId: group.id, targetUserId: contextMember.userId, role: "member" })}
-                  disabled={updateRole.isPending}
-                  className="w-full py-3.5 bg-[#F0EDE8] text-[#1A1512] font-semibold text-[14px] rounded-[12px] disabled:opacity-50"
-                >
-                  Make member
-                </button>
-              )}
-              <button
-                onClick={() => removeMember.mutate({ groupId: group.id, targetUserId: contextMember.userId })}
-                disabled={removeMember.isPending}
-                className="w-full py-3.5 bg-[rgba(232,64,64,0.10)] text-[#E84040] font-semibold text-[14px] rounded-[12px] disabled:opacity-50"
-              >
-                {removeMember.isPending ? "Removing…" : "Remove from group"}
-              </button>
-              <button
-                onClick={() => setContextMember(null)}
-                className="w-full py-3.5 border border-[#E5E0DA] text-[#6B6560] font-semibold text-[14px] rounded-[12px]"
-              >
-                Cancel
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

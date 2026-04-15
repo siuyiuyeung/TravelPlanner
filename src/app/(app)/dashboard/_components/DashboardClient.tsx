@@ -5,6 +5,7 @@ import { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { api } from "@/lib/trpc/client";
 import type { Session } from "@/server/auth";
+import { BottomSheet, BottomSheetTitle } from "@/components/ui/bottom-sheet";
 
 type Group = {
   id: string;
@@ -289,30 +290,26 @@ export function DashboardClient({ session, groups }: Props) {
         </section>
       )}
 
-      {/* Delete confirm overlay */}
-      {deleteConfirmId && (
-        <div className="fixed inset-0 z-50 flex items-end">
-          <div className="absolute inset-0 bg-[#1A1512]/40" onClick={() => setDeleteConfirmId(null)} />
-          <div className="relative w-full bg-white rounded-t-[24px] p-5 pb-10 space-y-3">
-            <div className="w-9 h-1 rounded-full bg-[#E5E0DA] mx-auto mb-4" />
-            <p className="text-[17px] font-bold text-[#1A1512]">Delete trip?</p>
-            <p className="text-sm text-[#6B6560]">This will permanently delete the trip and all its itinerary items. This cannot be undone.</p>
-            <button
-              onClick={() => deleteTrip.mutate({ tripId: deleteConfirmId })}
-              disabled={deleteTrip.isPending}
-              className="w-full py-4 bg-[#E84040] text-white font-bold text-[15px] rounded-[12px] disabled:opacity-50 mt-2"
-            >
-              {deleteTrip.isPending ? "Deleting…" : "Delete trip"}
-            </button>
-            <button
-              onClick={() => setDeleteConfirmId(null)}
-              className="w-full py-4 border border-[#E5E0DA] text-[#6B6560] font-semibold text-[15px] rounded-[12px]"
-            >
-              Cancel
-            </button>
-          </div>
+      {/* Delete confirm sheet */}
+      <BottomSheet open={deleteConfirmId !== null} onOpenChange={(open) => { if (!open) setDeleteConfirmId(null); }}>
+        <BottomSheetTitle>Delete trip?</BottomSheetTitle>
+        <div className="px-5 pb-8 space-y-3">
+          <p className="text-sm text-[#6B6560]">This will permanently delete the trip and all its itinerary items. This cannot be undone.</p>
+          <button
+            onClick={() => { if (deleteConfirmId) deleteTrip.mutate({ tripId: deleteConfirmId }); }}
+            disabled={deleteTrip.isPending}
+            className="w-full py-4 bg-[#E84040] text-white font-bold text-[15px] rounded-[12px] disabled:opacity-50 mt-2"
+          >
+            {deleteTrip.isPending ? "Deleting…" : "Delete trip"}
+          </button>
+          <button
+            onClick={() => setDeleteConfirmId(null)}
+            className="w-full py-4 border border-[#E5E0DA] text-[#6B6560] font-semibold text-[15px] rounded-[12px]"
+          >
+            Cancel
+          </button>
         </div>
-      )}
+      </BottomSheet>
     </div>
   );
 }

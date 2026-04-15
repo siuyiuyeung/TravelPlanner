@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { api } from "@/lib/trpc/client";
+import { useSwipeToDelete } from "@/hooks/use-swipe-to-delete";
 import { BottomSheet, BottomSheetTitle } from "@/components/ui/bottom-sheet";
 import { formatCurrency } from "@/lib/utils";
 
@@ -274,6 +275,68 @@ type Props = {
   budgetCurrency: string;
 };
 
+function timeAgo(d: Date | string) {
+  const mins = Math.floor((Date.now() - new Date(d).getTime()) / 60_000);
+  if (mins < 1) return "just now";
+  if (mins < 60) return `${mins}m ago`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs}h ago`;
+  return `${Math.floor(hrs / 24)}d ago`;
+}
+
+function SwipeableExpenseRow({
+  entry,
+  meta,
+  isOwn,
+  onEdit,
+  onDelete,
+}: {
+  entry: ActualEntry;
+  meta: { emoji: string; color: string };
+  isOwn: boolean;
+  onEdit: () => void;
+  onDelete: () => void;
+}) {
+  const { swiped, onTouchStart, onTouchEnd } = useSwipeToDelete();
+
+  return (
+    <div className="relative overflow-hidden">
+      {isOwn && (
+        <div className="absolute inset-y-0 right-0 w-20 bg-[#E84040] flex items-center justify-center">
+          <button onClick={onDelete} className="flex flex-col items-center gap-1">
+            <span className="text-white text-xl">🗑</span>
+            <span className="text-white text-[10px] font-semibold">Delete</span>
+          </button>
+        </div>
+      )}
+      <div
+        onTouchStart={isOwn ? onTouchStart : undefined}
+        onTouchEnd={isOwn ? onTouchEnd : undefined}
+        style={isOwn ? { transform: swiped ? "translateX(-80px)" : "translateX(0)", transition: "transform 0.2s ease" } : undefined}
+        className="flex items-center gap-3 px-4 py-3 active:bg-[#F0EDE8] transition-colors cursor-pointer bg-white"
+        onClick={() => isOwn && onEdit()}
+      >
+        <div
+          className="w-9 h-9 rounded-full flex items-center justify-center text-base flex-shrink-0"
+          style={{ backgroundColor: `${meta.color}20` }}
+        >
+          {meta.emoji}
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="text-[13px] font-semibold text-[#1A1512] truncate">{entry.title}</p>
+          <p className="text-[11px] text-[#A09B96]">
+            {entry.payerName.split(" ")[0]} · {timeAgo(entry.sortKey)}
+            {isOwn && <span className="text-[#A09B96]"> · tap to edit</span>}
+          </p>
+        </div>
+        <span className="text-[14px] font-bold text-[#1A1512] flex-shrink-0">
+          {formatCurrency(entry.amountCents, entry.currency)}
+        </span>
+      </div>
+    </div>
+  );
+}
+
 export function BudgetTab({ tripId, userId, members, itineraryItems, budgetCents, budgetCurrency }: Props) {
   const [addOpen, setAddOpen] = useState(false);
   const [editingExpense, setEditingExpense] = useState<ActualEntry | null>(null);
@@ -376,15 +439,6 @@ export function BudgetTab({ tripId, userId, members, itineraryItems, budgetCents
     })).filter((c) => c.amount > 0);
     return { currency: cur, total, cats };
   });
-
-  function timeAgo(d: Date | string) {
-    const mins = Math.floor((Date.now() - new Date(d).getTime()) / 60_000);
-    if (mins < 1) return "just now";
-    if (mins < 60) return `${mins}m ago`;
-    const hrs = Math.floor(mins / 60);
-    if (hrs < 24) return `${hrs}h ago`;
-    return `${Math.floor(hrs / 24)}d ago`;
-  }
 
   function saveBudget() {
     const cents = Math.round(parseFloat(budgetInput) * 100);
@@ -605,38 +659,14 @@ export function BudgetTab({ tripId, userId, members, itineraryItems, budgetCents
                 // kind === "actual"
                 const isOwn = entry.paidBy === userId;
                 return (
-                  <div
+                  <SwipeableExpenseRow
                     key={entry.id}
-                    className="flex items-center gap-3 px-4 py-3 active:bg-[#F0EDE8] transition-colors cursor-pointer"
-                    onClick={() => isOwn && setEditingExpense(entry)}
-                  >
-                    <div
-                      className="w-9 h-9 rounded-full flex items-center justify-center text-base flex-shrink-0"
-                      style={{ backgroundColor: `${meta.color}20` }}
-                    >
-                      {meta.emoji}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-[13px] font-semibold text-[#1A1512] truncate">{entry.title}</p>
-                      <p className="text-[11px] text-[#A09B96]">
-                        {entry.payerName.split(" ")[0]} · {timeAgo(entry.sortKey)}
-                        {isOwn && <span className="text-[#A09B96]"> · tap to edit</span>}
-                      </p>
-                    </div>
-                    <div className="flex items-center gap-2 flex-shrink-0" onClick={(e) => e.stopPropagation()}>
-                      <span className="text-[14px] font-bold text-[#1A1512]">
-                        {formatCurrency(entry.amountCents, entry.currency)}
-                      </span>
-                      {isOwn && (
-                        <button
-                          onClick={() => deleteExpense.mutate({ expenseId: entry.id })}
-                          className="w-6 h-6 rounded-full bg-[#F0EDE8] flex items-center justify-center text-[#A09B96] text-xs"
-                        >
-                          ×
-                        </button>
-                      )}
-                    </div>
-                  </div>
+                    entry={entry}
+                    meta={meta}
+                    isOwn={isOwn}
+                    onEdit={() => setEditingExpense(entry)}
+                    onDelete={() => deleteExpense.mutate({ expenseId: entry.id })}
+                  />
                 );
               })}
             </div>

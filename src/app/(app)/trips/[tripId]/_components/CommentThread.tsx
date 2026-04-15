@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect } from "react";
 import { api } from "@/lib/trpc/client";
+import { useSwipeToDelete } from "@/hooks/use-swipe-to-delete";
 import type { AppRouter } from "@/server/routers/_app";
 import type { inferRouterOutputs } from "@trpc/server";
 
@@ -33,6 +34,7 @@ function CommentBubble({
   onReact: (commentId: string, emoji: Reaction) => void;
 }) {
   const isOwn = comment.userId === currentUserId;
+  const { swiped, onTouchStart, onTouchEnd } = useSwipeToDelete();
   const reactions = (comment.reactions ?? {}) as Record<string, string[]>;
   const initials = comment.user.name.charAt(0).toUpperCase();
   const colors = ["bg-[#E8622A]", "bg-[#2D6A8F]", "bg-[#3D9970]", "bg-[#A78BFA]", "bg-[#F2A93B]"];
@@ -54,27 +56,28 @@ function CommentBubble({
           <span className="text-[10px] text-[#A09B96]">{formatTime(comment.createdAt)}</span>
         </div>
 
-        {/* Bubble */}
-        <div
-          className={`relative px-3 py-2 rounded-[14px] text-[14px] leading-snug ${
-            isOwn
-              ? "bg-[#E8622A] text-white rounded-tr-[4px]"
-              : "bg-white border border-[#E5E0DA] text-[#1A1512] rounded-tl-[4px]"
-          }`}
-        >
-          {comment.body}
-
-          {/* Delete button for own messages */}
-          {isOwn && (
-            <button
-              onClick={() => onDelete(comment.id)}
-              className="absolute -top-2 -right-1 w-5 h-5 bg-[#E5E0DA] rounded-full text-[10px] flex items-center justify-center text-[#6B6560] opacity-0 group-hover:opacity-100 hover:bg-[#E84040] hover:text-white transition-all"
-              title="Delete"
+        {/* Bubble — swipeable for own messages */}
+        {isOwn ? (
+          <div className="relative overflow-hidden rounded-[14px]">
+            <div className="absolute inset-y-0 left-0 w-16 bg-[#E84040] flex items-center justify-center rounded-l-[14px]">
+              <button onClick={() => onDelete(comment.id)} className="flex flex-col items-center gap-0.5">
+                <span className="text-white text-base">🗑</span>
+              </button>
+            </div>
+            <div
+              onTouchStart={onTouchStart}
+              onTouchEnd={onTouchEnd}
+              style={{ transform: swiped ? "translateX(64px)" : "translateX(0)", transition: "transform 0.2s ease" }}
+              className="px-3 py-2 rounded-[14px] text-[14px] leading-snug bg-[#E8622A] text-white rounded-tr-[4px]"
             >
-              ×
-            </button>
-          )}
-        </div>
+              {comment.body}
+            </div>
+          </div>
+        ) : (
+          <div className="px-3 py-2 rounded-[14px] text-[14px] leading-snug bg-white border border-[#E5E0DA] text-[#1A1512] rounded-tl-[4px]">
+            {comment.body}
+          </div>
+        )}
 
         {/* Reactions */}
         <div className={`flex flex-wrap gap-1 ${isOwn ? "justify-end" : ""}`}>
