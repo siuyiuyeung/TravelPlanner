@@ -328,7 +328,7 @@ export function TripDetailClient({ tripId, userId }: Props) {
       ? "—"
       : allSameCurrency
       ? formatCurrency(totalCostCents, costItems[0]!.currency ?? "USD")
-      : "mixed";
+      : `${costItems.length} item${costItems.length !== 1 ? "s" : ""}`;
   const totalDistKm = Object.values(legDistances).reduce((s, km) => s + km, 0);
   const distStat =
     totalDistKm === 0
