@@ -41,12 +41,12 @@ function SwipeableMemberRow({
   canRemove: boolean;
   onRemove: () => void;
 }) {
-  const { swiped, onTouchStart, onTouchEnd } = useSwipeToDelete();
+  const { swiped, onTouchStart, onTouchEnd, onMouseDown, onClickCapture } = useSwipeToDelete();
   const colors = ["bg-[#E8622A]", "bg-[#2D6A8F]", "bg-[#3D9970]", "bg-[#A78BFA]"];
   const colorIndex = member.userId.charCodeAt(0) % colors.length;
 
   return (
-    <div className="relative overflow-hidden rounded-[12px]">
+    <div className="relative overflow-hidden rounded-[12px]" onClickCapture={canRemove ? onClickCapture : undefined}>
       {canRemove && (
         <div className="absolute inset-y-0 right-0 w-20 bg-[#E84040] flex flex-col items-center justify-center rounded-r-[12px]">
           <button onClick={onRemove} className="flex flex-col items-center gap-1">
@@ -58,8 +58,9 @@ function SwipeableMemberRow({
       <div
         onTouchStart={canRemove ? onTouchStart : undefined}
         onTouchEnd={canRemove ? onTouchEnd : undefined}
+        onMouseDown={canRemove ? onMouseDown : undefined}
         style={canRemove ? { transform: swiped ? "translateX(-80px)" : "translateX(0)", transition: "transform 0.2s ease" } : undefined}
-        className="bg-white border border-[#E5E0DA] rounded-[12px] p-3 flex items-center gap-3"
+        className="bg-white border border-[#E5E0DA] rounded-[12px] p-3 flex items-center gap-3 select-none"
       >
         <div className={`w-9 h-9 rounded-full flex items-center justify-center text-[13px] font-bold text-white ${colors[colorIndex]}`}>
           {member.user.name.charAt(0).toUpperCase()}

@@ -34,7 +34,7 @@ function CommentBubble({
   onReact: (commentId: string, emoji: Reaction) => void;
 }) {
   const isOwn = comment.userId === currentUserId;
-  const { swiped, onTouchStart, onTouchEnd } = useSwipeToDelete();
+  const { swiped, onTouchStart, onTouchEnd, onMouseDown, onClickCapture } = useSwipeToDelete();
   const reactions = (comment.reactions ?? {}) as Record<string, string[]>;
   const initials = comment.user.name.charAt(0).toUpperCase();
   const colors = ["bg-[#E8622A]", "bg-[#2D6A8F]", "bg-[#3D9970]", "bg-[#A78BFA]", "bg-[#F2A93B]"];
@@ -56,19 +56,20 @@ function CommentBubble({
           <span className="text-[10px] text-[#A09B96]">{formatTime(comment.createdAt)}</span>
         </div>
 
-        {/* Bubble — swipeable for own messages */}
+        {/* Bubble — swipeable left for own messages */}
         {isOwn ? (
-          <div className="relative overflow-hidden rounded-[14px]">
-            <div className="absolute inset-y-0 left-0 w-16 bg-[#E84040] flex items-center justify-center rounded-l-[14px]">
-              <button onClick={() => onDelete(comment.id)} className="flex flex-col items-center gap-0.5">
+          <div className="relative overflow-hidden rounded-[14px]" onClickCapture={onClickCapture}>
+            <div className="absolute inset-y-0 right-0 w-16 bg-[#E84040] flex items-center justify-center rounded-r-[14px]">
+              <button onClick={() => onDelete(comment.id)}>
                 <span className="text-white text-base">🗑</span>
               </button>
             </div>
             <div
               onTouchStart={onTouchStart}
               onTouchEnd={onTouchEnd}
-              style={{ transform: swiped ? "translateX(64px)" : "translateX(0)", transition: "transform 0.2s ease" }}
-              className="px-3 py-2 rounded-[14px] text-[14px] leading-snug bg-[#E8622A] text-white rounded-tr-[4px]"
+              onMouseDown={onMouseDown}
+              style={{ transform: swiped ? "translateX(-64px)" : "translateX(0)", transition: "transform 0.2s ease" }}
+              className="px-3 py-2 rounded-[14px] text-[14px] leading-snug bg-[#E8622A] text-white rounded-tr-[4px] select-none"
             >
               {comment.body}
             </div>

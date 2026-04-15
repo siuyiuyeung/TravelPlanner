@@ -35,12 +35,12 @@ const STATUS_STYLES: Record<string, { bg: string; text: string; dot: string; lab
 type TripRow = Trip & { groupName: string; groupId: string; groupRole: string };
 
 function SwipeableTripRow({ trip, onDeleteRequest }: { trip: TripRow; onDeleteRequest: () => void }) {
-  const { swiped, onTouchStart, onTouchEnd } = useSwipeToDelete();
+  const { swiped, onTouchStart, onTouchEnd, onMouseDown, onClickCapture } = useSwipeToDelete();
   const style = STATUS_STYLES[trip.status] ?? STATUS_STYLES.planning!;
   const canDelete = trip.groupRole !== "member";
 
   return (
-    <div className="relative overflow-hidden rounded-[16px]">
+    <div className="relative overflow-hidden rounded-[16px]" onClickCapture={canDelete ? onClickCapture : undefined}>
       {canDelete && (
         <div className="absolute inset-y-0 right-0 w-20 bg-[#E84040] flex flex-col items-center justify-center rounded-r-[16px]">
           <button onClick={onDeleteRequest} className="flex flex-col items-center gap-1">
@@ -52,7 +52,9 @@ function SwipeableTripRow({ trip, onDeleteRequest }: { trip: TripRow; onDeleteRe
       <div
         onTouchStart={canDelete ? onTouchStart : undefined}
         onTouchEnd={canDelete ? onTouchEnd : undefined}
+        onMouseDown={canDelete ? onMouseDown : undefined}
         style={canDelete ? { transform: swiped ? "translateX(-80px)" : "translateX(0)", transition: "transform 0.2s ease" } : undefined}
+        className="select-none"
       >
         <Link
           href={`/trips/${trip.id}`}
@@ -67,7 +69,7 @@ function SwipeableTripRow({ trip, onDeleteRequest }: { trip: TripRow; onDeleteRe
               <p className="text-xs text-[#A09B96] mt-0.5">{trip.groupName}</p>
             </div>
             <span
-              className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold ${style.bg} ${style.text}`}
+              className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold flex-shrink-0 ${style.bg} ${style.text}`}
             >
               <span className={`w-1.5 h-1.5 rounded-full ${style.dot}`} />
               {style.label}

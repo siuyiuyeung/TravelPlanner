@@ -1,11 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { useState, useRef } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { api } from "@/lib/trpc/client";
 import type { Session } from "@/server/auth";
 import { BottomSheet, BottomSheetTitle } from "@/components/ui/bottom-sheet";
+import { useSwipeToDelete } from "@/hooks/use-swipe-to-delete";
 
 type Group = {
   id: string;
@@ -79,60 +80,31 @@ function SwipeableTripCard({
   canDelete: boolean;
   onDeleteRequest: (tripId: string) => void;
 }) {
-  const startX = useRef(0);
-  const [swipeX, setSwipeX] = useState(0);
-  const [swiped, setSwiped] = useState(false);
-
-  function onTouchStart(e: React.TouchEvent) {
-    startX.current = e.touches[0]!.clientX;
-  }
-  function onTouchMove(e: React.TouchEvent) {
-    const dx = e.touches[0]!.clientX - startX.current;
-    if (dx < 0) setSwipeX(Math.max(dx, -80));
-  }
-  function onTouchEnd() {
-    if (swipeX < -50) {
-      setSwipeX(-80);
-      setSwiped(true);
-    } else {
-      setSwipeX(0);
-      setSwiped(false);
-    }
-  }
-
-  function dismissSwipe() {
-    setSwipeX(0);
-    setSwiped(false);
-  }
+  const { swiped, onTouchStart, onTouchEnd, onMouseDown, onClickCapture } = useSwipeToDelete();
 
   return (
-    <div className="relative overflow-hidden rounded-[16px]">
-      {/* Delete action revealed by swipe */}
-      <div className="absolute inset-y-0 right-0 w-20 flex items-center justify-center bg-[#E84040] rounded-r-[16px]">
-        <button
-          onClick={() => onDeleteRequest(trip.id)}
-          className="flex flex-col items-center gap-1 text-white"
-        >
-          <span className="text-lg">🗑️</span>
-          <span className="text-[10px] font-bold">Delete</span>
-        </button>
-      </div>
+    <div className="relative overflow-hidden rounded-[16px]" onClickCapture={canDelete ? onClickCapture : undefined}>
+      {canDelete && (
+        <div className="absolute inset-y-0 right-0 w-20 flex items-center justify-center bg-[#E84040] rounded-r-[16px]">
+          <button
+            onClick={() => onDeleteRequest(trip.id)}
+            className="flex flex-col items-center gap-1 text-white"
+          >
+            <span className="text-lg">🗑️</span>
+            <span className="text-[10px] font-bold">Delete</span>
+          </button>
+        </div>
+      )}
 
-      {/* Card */}
       <div
-        className="relative shadow-[0_2px_8px_rgba(26,21,18,0.08)] transition-transform duration-150"
-        style={{ transform: `translateX(${swipeX}px)` }}
-        onTouchStart={onTouchStart}
-        onTouchMove={onTouchMove}
-        onTouchEnd={onTouchEnd}
+        className="relative shadow-[0_2px_8px_rgba(26,21,18,0.08)] select-none"
+        style={canDelete ? { transform: swiped ? "translateX(-80px)" : "translateX(0)", transition: "transform 0.2s ease" } : undefined}
+        onTouchStart={canDelete ? onTouchStart : undefined}
+        onTouchEnd={canDelete ? onTouchEnd : undefined}
+        onMouseDown={canDelete ? onMouseDown : undefined}
       >
-        {swiped && (
-          // Tap elsewhere to dismiss
-          <div className="absolute inset-0 z-10" onClick={dismissSwipe} />
-        )}
         <Link
           href={`/trips/${trip.id}`}
-          onClick={(e) => { if (swiped) { e.preventDefault(); dismissSwipe(); } }}
           className="block rounded-[16px] overflow-hidden transition-shadow hover:shadow-[0_4px_16px_rgba(26,21,18,0.10)] active:scale-[0.99]"
         >
           <div className={`h-[120px] bg-gradient-to-br ${getGradient(gradientIndex)} p-3.5 flex flex-col justify-end`}>
@@ -161,19 +133,7 @@ function SwipeableTripCard({
                 {trip.status === "planning" ? "Planning" : "Active"}
               </span>
             </div>
-            <div className="flex items-center gap-2">
-              <AvatarStack members={groupMembers} />
-              {canDelete && (
-                <button
-                  type="button"
-                  onClick={(e) => { e.preventDefault(); e.stopPropagation(); onDeleteRequest(trip.id); }}
-                  className="w-8 h-8 flex items-center justify-center rounded-full text-[#A09B96] hover:bg-[#F0EDE8] hover:text-[#E84040] transition-colors text-[18px] leading-none flex-shrink-0"
-                  aria-label="Trip options"
-                >
-                  ···
-                </button>
-              )}
-            </div>
+            <AvatarStack members={groupMembers} />
           </div>
         </Link>
       </div>

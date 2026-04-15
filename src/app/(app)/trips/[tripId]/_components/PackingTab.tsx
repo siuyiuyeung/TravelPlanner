@@ -2,6 +2,7 @@
 
 import { useState, useRef } from "react";
 import { api } from "@/lib/trpc/client";
+import { useSwipeToDelete } from "@/hooks/use-swipe-to-delete";
 
 type Props = {
   tripId: string;
@@ -155,8 +156,7 @@ function PackingItemRow({
   userId: string;
 }) {
   const utils = api.useUtils();
-  const [swiped, setSwiped] = useState(false);
-  const startX = useRef(0);
+  const { swiped, onTouchStart, onTouchEnd, onMouseDown, onClickCapture } = useSwipeToDelete();
 
   const toggle = api.packing.toggleCheck.useMutation({
     onMutate: async () => {
@@ -180,18 +180,8 @@ function PackingItemRow({
   const cat = categoryMeta(item.category);
   const canDelete = item.addedBy === userId;
 
-  function onTouchStart(e: React.TouchEvent) {
-    startX.current = e.touches[0]!.clientX;
-  }
-  function onTouchEnd(e: React.TouchEvent) {
-    const dx = e.changedTouches[0]!.clientX - startX.current;
-    if (dx < -50) setSwiped(true);
-    else if (dx > 20) setSwiped(false);
-  }
-
   return (
-    <div className="relative overflow-hidden rounded-[12px]">
-      {/* Delete button revealed on swipe */}
+    <div className="relative overflow-hidden rounded-[12px]" onClickCapture={canDelete ? onClickCapture : undefined}>
       {canDelete && (
         <div className="absolute inset-y-0 right-0 w-20 bg-[#E84040] flex items-center justify-center rounded-r-[12px]">
           <button
@@ -204,10 +194,11 @@ function PackingItemRow({
       )}
 
       <div
-        onTouchStart={onTouchStart}
-        onTouchEnd={onTouchEnd}
-        style={{ transform: swiped && canDelete ? "translateX(-80px)" : "translateX(0)", transition: "transform 0.2s ease" }}
-        className="bg-white border border-[#E5E0DA] rounded-[12px] flex items-center gap-3 px-4 py-3"
+        onTouchStart={canDelete ? onTouchStart : undefined}
+        onTouchEnd={canDelete ? onTouchEnd : undefined}
+        onMouseDown={canDelete ? onMouseDown : undefined}
+        style={canDelete ? { transform: swiped ? "translateX(-80px)" : "translateX(0)", transition: "transform 0.2s ease" } : undefined}
+        className="bg-white border border-[#E5E0DA] rounded-[12px] flex items-center gap-3 px-4 py-3 select-none"
       >
         {/* Checkbox */}
         <button

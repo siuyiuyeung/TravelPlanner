@@ -297,10 +297,10 @@ function SwipeableExpenseRow({
   onEdit: () => void;
   onDelete: () => void;
 }) {
-  const { swiped, onTouchStart, onTouchEnd } = useSwipeToDelete();
+  const { swiped, onTouchStart, onTouchEnd, onMouseDown, onClickCapture } = useSwipeToDelete();
 
   return (
-    <div className="relative overflow-hidden">
+    <div className="relative overflow-hidden" onClickCapture={isOwn ? onClickCapture : undefined}>
       {isOwn && (
         <div className="absolute inset-y-0 right-0 w-20 bg-[#E84040] flex items-center justify-center">
           <button onClick={onDelete} className="flex flex-col items-center gap-1">
@@ -312,8 +312,9 @@ function SwipeableExpenseRow({
       <div
         onTouchStart={isOwn ? onTouchStart : undefined}
         onTouchEnd={isOwn ? onTouchEnd : undefined}
+        onMouseDown={isOwn ? onMouseDown : undefined}
         style={isOwn ? { transform: swiped ? "translateX(-80px)" : "translateX(0)", transition: "transform 0.2s ease" } : undefined}
-        className="flex items-center gap-3 px-4 py-3 active:bg-[#F0EDE8] transition-colors cursor-pointer bg-white"
+        className="flex items-center gap-3 px-4 py-3 active:bg-[#F0EDE8] transition-colors cursor-pointer bg-white select-none"
         onClick={() => isOwn && onEdit()}
       >
         <div

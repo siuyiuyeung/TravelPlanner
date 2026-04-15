@@ -58,11 +58,11 @@ function SwipeableGroupRow({
   onDeleteRequest: () => void;
   onLeave: () => void;
 }) {
-  const { swiped, onTouchStart, onTouchEnd } = useSwipeToDelete();
+  const { swiped, onTouchStart, onTouchEnd, onMouseDown, onClickCapture } = useSwipeToDelete();
   const isOwner = group.role === "owner";
 
   return (
-    <div className="relative overflow-hidden rounded-[16px]">
+    <div className="relative overflow-hidden rounded-[16px]" onClickCapture={onClickCapture}>
       <div className="absolute inset-y-0 right-0 w-20 bg-[#E84040] flex flex-col items-center justify-center rounded-r-[16px]">
         <button onClick={isOwner ? onDeleteRequest : onLeave} className="flex flex-col items-center gap-1">
           <span className="text-white text-xl">🗑</span>
@@ -72,7 +72,9 @@ function SwipeableGroupRow({
       <div
         onTouchStart={onTouchStart}
         onTouchEnd={onTouchEnd}
+        onMouseDown={onMouseDown}
         style={{ transform: swiped ? "translateX(-80px)" : "translateX(0)", transition: "transform 0.2s ease" }}
+        className="select-none"
       >
         <Link
           href={`/groups/${group.id}`}
