@@ -633,13 +633,15 @@ export function TripDetailClient({ tripId, userId }: Props) {
         )}
       </div>
 
-      {/* FAB */}
-      <button
-        onClick={() => setAddItemOpen(true)}
-        className="fixed bottom-24 right-5 w-14 h-14 bg-[#E8622A] rounded-full shadow-[0_4px_16px_rgba(232,98,42,0.40)] flex items-center justify-center text-white text-2xl z-40"
-      >
-        +
-      </button>
+      {/* FAB — only on Plan tab */}
+      {tab === "itinerary" && (
+        <button
+          onClick={() => setAddItemOpen(true)}
+          className="fixed bottom-24 right-5 w-14 h-14 bg-[#E8622A] rounded-full shadow-[0_4px_16px_rgba(232,98,42,0.40)] flex items-center justify-center text-white text-2xl z-40"
+        >
+          +
+        </button>
+      )}
 
       {/* Add item sheet */}
       <BottomSheet open={addItemOpen} onOpenChange={setAddItemOpen}>
