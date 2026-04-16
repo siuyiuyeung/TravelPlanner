@@ -1,7 +1,7 @@
 import { Resend } from "resend";
 
 const resend = new Resend(process.env.RESEND_API_KEY);
-const FROM = "TravelPlanner <onboarding@resend.dev>";
+const FROM = "TravelPlanner <system@travel.syapps.net>";
 
 export async function sendVerificationEmail(to: string, url: string) {
   await resend.emails.send({
