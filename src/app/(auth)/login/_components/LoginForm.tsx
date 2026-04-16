@@ -18,7 +18,13 @@ export function LoginForm() {
     try {
       const result = await signIn.email({ email, password });
       if (result.error) {
-        toast.error(result.error.message ?? "Invalid credentials");
+        if (result.error.status === 403) {
+          // Email not verified — a fresh verification email was auto-sent by the server
+          toast.info("Check your inbox — we've sent you a verification link.");
+          router.push("/verify-email");
+        } else {
+          toast.error(result.error.message ?? "Invalid credentials");
+        }
       } else {
         router.push("/dashboard");
         router.refresh();
