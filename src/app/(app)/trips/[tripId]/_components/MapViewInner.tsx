@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useRef } from "react";
-import { MapContainer, TileLayer, Marker, Popup, Polyline, useMap } from "react-leaflet";
+import { useEffect, useRef, useState } from "react";
+import { MapContainer, TileLayer, Marker, Popup, Polyline, CircleMarker, useMap } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 
@@ -61,6 +61,93 @@ function makeIcon(emoji: string, seq: number) {
   });
 }
 
+type LocateStatus = "idle" | "loading" | "error";
+
+function LocateControl({
+  onLocate,
+}: {
+  onLocate: (pos: [number, number]) => void;
+}) {
+  const map = useMap();
+  const [status, setStatus] = useState<LocateStatus>("idle");
+
+  function handleLocate() {
+    if (!navigator.geolocation) {
+      setStatus("error");
+      return;
+    }
+    setStatus("loading");
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const coords: [number, number] = [pos.coords.latitude, pos.coords.longitude];
+        map.setView(coords, 16, { animate: true });
+        onLocate(coords);
+        setStatus("idle");
+      },
+      () => {
+        setStatus("error");
+        setTimeout(() => setStatus("idle"), 2000);
+      },
+      { enableHighAccuracy: true, timeout: 10000 }
+    );
+  }
+
+  return (
+    <div
+      style={{
+        position: "absolute",
+        bottom: 24,
+        right: 12,
+        zIndex: 1000,
+      }}
+    >
+      <button
+        onClick={handleLocate}
+        title="Go to my location"
+        style={{
+          width: 40,
+          height: 40,
+          borderRadius: "50%",
+          background: "#fff",
+          border: "none",
+          boxShadow: "0 2px 8px rgba(0,0,0,0.25)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          cursor: "pointer",
+          transition: "box-shadow 0.15s",
+        }}
+      >
+        {status === "loading" ? (
+          <div
+            style={{
+              width: 18,
+              height: 18,
+              border: "2.5px solid #2D6A8F",
+              borderTopColor: "transparent",
+              borderRadius: "50%",
+              animation: "spin 0.7s linear infinite",
+            }}
+          />
+        ) : status === "error" ? (
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#E8622A" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="12" cy="12" r="10" />
+            <line x1="12" y1="8" x2="12" y2="12" />
+            <line x1="12" y1="16" x2="12.01" y2="16" />
+          </svg>
+        ) : (
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#2D6A8F" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="12" cy="12" r="3" />
+            <path d="M12 2v3M12 19v3M2 12h3M19 12h3" />
+            <circle cx="12" cy="12" r="8" />
+          </svg>
+        )}
+      </button>
+      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+    </div>
+  );
+}
+
 function FitBounds({ positions }: { positions: [number, number][] }) {
   const map = useMap();
   const fitted = useRef(false);
@@ -79,6 +166,8 @@ function FitBounds({ positions }: { positions: [number, number][] }) {
 }
 
 export function MapViewInner({ items, onSelectItem, routeCoords, totalKm }: Props) {
+  const [userPos, setUserPos] = useState<[number, number] | null>(null);
+
   const pinned = items.filter(
     (i) => i.locationLat !== null && i.locationLng !== null
   );
@@ -146,6 +235,23 @@ export function MapViewInner({ items, onSelectItem, routeCoords, totalKm }: Prop
           zoomOffset={-1}
         />
         <FitBounds positions={positions} />
+        <LocateControl onLocate={setUserPos} />
+
+        {/* User location dot */}
+        {userPos && (
+          <>
+            <CircleMarker
+              center={userPos}
+              radius={10}
+              pathOptions={{ color: "#fff", weight: 2, fillColor: "#4285F4", fillOpacity: 0.25 }}
+            />
+            <CircleMarker
+              center={userPos}
+              radius={6}
+              pathOptions={{ color: "#fff", weight: 2, fillColor: "#4285F4", fillOpacity: 1 }}
+            />
+          </>
+        )}
 
         {routeCoords.length > 1 && (
           <Polyline
