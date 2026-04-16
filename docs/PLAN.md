@@ -21,6 +21,8 @@
 - [x] Email/password register + login
 - [x] Better Auth session management
 - [x] 2-screen swipe onboarding (first login only)
+- [x] Email verification on sign-up (Resend) — unverified users blocked from app
+- [x] Forgot password / reset password via email (Resend)
 
 ### 2. Groups
 - [x] Create group (name, optional cover photo)

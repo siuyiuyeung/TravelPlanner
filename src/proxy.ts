@@ -3,22 +3,31 @@ import { getSessionCookie } from "better-auth/cookies";
 
 export async function proxy(request: NextRequest) {
   const sessionCookie = getSessionCookie(request);
+  const { pathname } = request.nextUrl;
 
+  // Always accessible — no redirect in either direction
+  const isOpenRoute =
+    pathname.startsWith("/verify-email") ||
+    pathname.startsWith("/reset-password") ||
+    pathname.startsWith("/join/");
+
+  // Auth-only routes — unauthenticated users may access; authenticated users are
+  // redirected to the dashboard (they don't need login/register again)
   const isAuthRoute =
-    request.nextUrl.pathname.startsWith("/login") ||
-    request.nextUrl.pathname.startsWith("/register") ||
-    request.nextUrl.pathname.startsWith("/forgot-password");
+    pathname.startsWith("/login") ||
+    pathname.startsWith("/register") ||
+    pathname.startsWith("/forgot-password");
 
   const isPublicApiRoute =
-    request.nextUrl.pathname.startsWith("/api/auth") ||
-    request.nextUrl.pathname.startsWith("/api/health");
+    pathname.startsWith("/api/auth") ||
+    pathname.startsWith("/api/health");
 
-  if (isPublicApiRoute) return NextResponse.next();
+  if (isPublicApiRoute || isOpenRoute) return NextResponse.next();
 
   if (!sessionCookie) {
     if (isAuthRoute) return NextResponse.next();
     const loginUrl = new URL("/login", request.url);
-    loginUrl.searchParams.set("callbackUrl", request.nextUrl.pathname);
+    loginUrl.searchParams.set("callbackUrl", pathname);
     return NextResponse.redirect(loginUrl);
   }
 

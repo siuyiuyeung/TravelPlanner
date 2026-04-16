@@ -59,9 +59,14 @@ export function LoginForm() {
           </div>
 
           <div className="space-y-1.5" suppressHydrationWarning>
-            <label className="text-xs font-semibold text-[#6B6560] uppercase tracking-wide">
-              Password
-            </label>
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-semibold text-[#6B6560] uppercase tracking-wide">
+                Password
+              </label>
+              <Link href="/forgot-password" className="text-xs text-[#E8622A] font-semibold">
+                Forgot password?
+              </Link>
+            </div>
             <input
               type="password"
               value={password}
