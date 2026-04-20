@@ -557,7 +557,7 @@ export function TripDetailClient({ tripId, userId }: Props) {
         {tab === "map" && (
           <>
             <MapView
-              items={trip.itineraryItems}
+              items={pinnedItems}
               onSelectItem={(id) => setMapSelectedId(id)}
               routeCoords={combinedPolyline}
               totalKm={Object.values(legDistances).reduce((s, km) => s + km, 0) || routeData?.totalKm}
