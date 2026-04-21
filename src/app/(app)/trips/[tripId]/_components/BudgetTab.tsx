@@ -5,68 +5,22 @@ import { api } from "@/lib/trpc/client";
 import { useSwipeToDelete } from "@/hooks/use-swipe-to-delete";
 import { BottomSheet, BottomSheetTitle } from "@/components/ui/bottom-sheet";
 import { formatCurrency, parseCents, timeAgo } from "@/lib/utils";
-
-type Category = "food" | "transport" | "accommodation" | "activity" | "other";
-
-const CATEGORY_META: Record<Category, { label: string; emoji: string; color: string }> = {
-  food:          { label: "Food",          emoji: "🍽️", color: "#E8622A" },
-  transport:     { label: "Transport",     emoji: "🚗", color: "#2D6A8F" },
-  accommodation: { label: "Accommodation", emoji: "🏨", color: "#A78BFA" },
-  activity:      { label: "Activity",      emoji: "🎭", color: "#3D9970" },
-  other:         { label: "Other",         emoji: "📦", color: "#F2A93B" },
-};
-
-const CATEGORIES = Object.keys(CATEGORY_META) as Category[];
-
-const SUPPORTED_CURRENCIES = [
-  { code: "HKD", label: "HK Dollar",      symbol: "HK$" },
-  { code: "USD", label: "US Dollar",       symbol: "$"   },
-  { code: "EUR", label: "Euro",            symbol: "€"   },
-  { code: "GBP", label: "British Pound",   symbol: "£"   },
-  { code: "JPY", label: "Japanese Yen",    symbol: "¥"   },
-  { code: "CNY", label: "Chinese Yuan",    symbol: "CN¥" },
-  { code: "AUD", label: "Australian $",    symbol: "A$"  },
-  { code: "CAD", label: "Canadian $",      symbol: "C$"  },
-  { code: "CHF", label: "Swiss Franc",     symbol: "Fr"  },
-  { code: "INR", label: "Indian Rupee",    symbol: "₹"   },
-  { code: "SGD", label: "Singapore $",     symbol: "S$"  },
-  { code: "MXN", label: "Mexican Peso",    symbol: "MX$" },
-] as const;
-
-type CurrencyCode = typeof SUPPORTED_CURRENCIES[number]["code"];
-
-const DEFAULT_CURRENCY: CurrencyCode = "HKD";
-const VALID_CURRENCY_CODES: Set<string> = new Set(SUPPORTED_CURRENCIES.map((c) => c.code));
-function toValidCurrency(code: string | null | undefined): CurrencyCode {
-  return VALID_CURRENCY_CODES.has(code ?? "") ? (code as CurrencyCode) : DEFAULT_CURRENCY;
-}
-
-const ITEM_TYPE_TO_CATEGORY: Record<string, Category> = {
-  flight:     "transport",
-  hotel:      "accommodation",
-  restaurant: "food",
-  activity:   "activity",
-  transport:  "transport",
-  note:       "other",
-};
+import {
+  CATEGORY_META,
+  CATEGORIES,
+  SUPPORTED_CURRENCIES,
+  type Category,
+  type CurrencyCode,
+  toValidCurrency,
+} from "@/lib/budget-categories";
 
 type Member = { userId: string; user: { id: string; name: string } };
 
 type ItineraryItemProp = {
   id: string;
-  type: string;
   title: string;
-  costCents: number | null;
-  currency: string | null;
-};
-
-type PlannedEntry = {
-  kind: "planned";
-  id: string;           // itinerary item id
-  title: string;
-  category: Category;
-  amountCents: number;
-  currency: string;
+  startTime: Date | string | null;
+  sortOrder: number;
 };
 
 type ActualEntry = {
@@ -79,9 +33,11 @@ type ActualEntry = {
   payerName: string;
   paidBy: string;
   sortKey: Date;
+  linkedItemId?: string;
+  linkedItemTitle?: string;
 };
 
-type BudgetEntry = PlannedEntry | ActualEntry;
+type ItineraryItemOption = { id: string; title: string };
 
 function DonutChart({ segments, total }: { segments: { category: Category; amount: number }[]; total: number }) {
   const SIZE = 140;
@@ -99,13 +55,14 @@ function DonutChart({ segments, total }: { segments: { category: Category; amoun
     );
   }
 
-  let offset = 0;
-  const arcs = segments.map(({ category, amount }) => {
-    const dash = (amount / total) * circumference;
-    const arc = { category, dash, gap: circumference - dash, offset };
-    offset += dash;
-    return arc;
-  });
+  const arcs = segments.reduce<{ category: Category; dash: number; gap: number; offset: number }[]>(
+    (acc, { category, amount }) => {
+      const prevOffset = acc.length > 0 ? acc[acc.length - 1]!.offset + acc[acc.length - 1]!.dash : 0;
+      const dash = (amount / total) * circumference;
+      return [...acc, { category, dash, gap: circumference - dash, offset: prevOffset }];
+    },
+    []
+  );
 
   return (
     <svg width={SIZE} height={SIZE} viewBox={`0 0 ${SIZE} ${SIZE}`} style={{ transform: "rotate(-90deg)" }}>
@@ -125,17 +82,20 @@ function DonutChart({ segments, total }: { segments: { category: Category; amoun
 }
 
 type ExpenseFormProps =
-  | { mode: "add"; tripId: string; members: Member[]; itineraryItemId?: string; initialValues?: { title: string; amountCents: number; currency: string; category: Category }; onSuccess: () => void }
-  | { mode: "edit"; expenseId: string; initial: { title: string; amountCents: number; currency: string; category: Category; paidBy: string }; members: Member[]; onSuccess: () => void };
+  | { mode: "add"; tripId: string; members: Member[]; itineraryItems: ItineraryItemOption[]; onSuccess: () => void }
+  | { mode: "edit"; expenseId: string; initial: { title: string; amountCents: number; currency: string; category: Category; paidBy: string }; members: Member[]; itineraryItems: ItineraryItemOption[]; initialLinkedItemId?: string; onSuccess: () => void };
 
 function ExpenseForm(props: ExpenseFormProps) {
-  const init = props.mode === "edit" ? props.initial : (props.mode === "add" ? props.initialValues : null);
+  const init = props.mode === "edit" ? props.initial : null;
   const [title, setTitle] = useState(init?.title ?? "");
   const [amount, setAmount] = useState(init ? String(init.amountCents / 100) : "");
   const [currency, setCurrency] = useState<CurrencyCode>(toValidCurrency(init?.currency));
   const [category, setCategory] = useState<Category>(init?.category ?? "other");
   const [paidByUserId, setPaidBy] = useState<string>(
     props.mode === "edit" ? (props.initial.paidBy ?? "") : ""
+  );
+  const [linkedItemId, setLinkedItemId] = useState(
+    props.mode === "edit" ? (props.initialLinkedItemId ?? "") : ""
   );
 
   const add = api.budget.add.useMutation({ onSuccess: props.onSuccess });
@@ -154,11 +114,12 @@ function ExpenseForm(props: ExpenseFormProps) {
         currency,
         category,
         paidByUserId: paidByUserId || undefined,
+        itineraryItemId: linkedItemId || null,
       });
     } else {
       add.mutate({
         tripId: props.tripId,
-        itineraryItemId: props.itineraryItemId,
+        itineraryItemId: linkedItemId || undefined,
         title: title.trim(),
         amountCents: cents,
         currency,
@@ -247,6 +208,22 @@ function ExpenseForm(props: ExpenseFormProps) {
         </div>
       )}
 
+      {props.itineraryItems.length > 0 && (
+        <div>
+          <label className="block text-xs font-semibold text-[#6B6560] mb-1.5">Link to plan item</label>
+          <select
+            value={linkedItemId}
+            onChange={(e) => setLinkedItemId(e.target.value)}
+            className="w-full px-3.5 py-3 bg-[#F0EDE8] rounded-[10px] text-[15px] text-[#1A1512] outline-none"
+          >
+            <option value="">— None —</option>
+            {props.itineraryItems.map((item) => (
+              <option key={item.id} value={item.id}>{item.title}</option>
+            ))}
+          </select>
+        </div>
+      )}
+
       <button
         type="submit"
         disabled={isPending}
@@ -310,8 +287,9 @@ function SwipeableExpenseRow({
         </div>
         <div className="flex-1 min-w-0">
           <p className="text-[13px] font-semibold text-[#1A1512] truncate">{entry.title}</p>
-          <p className="text-[11px] text-[#A09B96]">
+          <p className="text-[11px] text-[#A09B96] truncate">
             {entry.payerName.split(" ")[0]} · {timeAgo(entry.sortKey)}
+            {entry.linkedItemTitle && <> · 📌 {entry.linkedItemTitle}</>}
             {isOwn && <span className="text-[#A09B96]"> · tap to edit</span>}
           </p>
         </div>
@@ -326,7 +304,6 @@ function SwipeableExpenseRow({
 export function BudgetTab({ tripId, userId, members, itineraryItems, budgetCents, budgetCurrency }: Props) {
   const [addOpen, setAddOpen] = useState(false);
   const [editingExpense, setEditingExpense] = useState<ActualEntry | null>(null);
-  const [markingPaid, setMarkingPaid] = useState<PlannedEntry | null>(null);
   const [editingBudget, setEditingBudget] = useState(false);
   const [budgetInput, setBudgetInput] = useState("");
   const [budgetCurInput, setBudgetCurInput] = useState<CurrencyCode>(toValidCurrency(budgetCurrency));
@@ -345,25 +322,15 @@ export function BudgetTab({ tripId, userId, members, itineraryItems, budgetCents
     },
   });
 
-  // Items that already have a linked expense are shown as actuals — exclude from planned
-  const paidItemIds = useMemo(
-    () => new Set(expenses.map((e) => e.itineraryItemId).filter(Boolean)),
-    [expenses]
-  );
-
-  const plannedEntries = useMemo<PlannedEntry[]>(
+  const sortedItineraryItems = useMemo<ItineraryItemOption[]>(
     () =>
-      itineraryItems
-        .filter((i) => (i.costCents ?? 0) > 0 && !paidItemIds.has(i.id))
-        .map((i) => ({
-          kind: "planned",
-          id: i.id,
-          title: i.title,
-          category: ITEM_TYPE_TO_CATEGORY[i.type] ?? "other",
-          amountCents: i.costCents!,
-          currency: i.currency ?? DEFAULT_CURRENCY,
-        })),
-    [itineraryItems, paidItemIds]
+      [...itineraryItems].sort((a, b) => {
+        if (!a.startTime && !b.startTime) return a.sortOrder - b.sortOrder;
+        if (!a.startTime) return 1;
+        if (!b.startTime) return -1;
+        return new Date(a.startTime).getTime() - new Date(b.startTime).getTime() || a.sortOrder - b.sortOrder;
+      }),
+    [itineraryItems]
   );
 
   const actualEntries = useMemo<ActualEntry[]>(
@@ -378,61 +345,50 @@ export function BudgetTab({ tripId, userId, members, itineraryItems, budgetCents
         payerName: e.payer.name,
         paidBy: e.paidBy,
         sortKey: new Date(e.paidAt),
+        ...(e.itineraryItem
+          ? { linkedItemId: e.itineraryItem.id, linkedItemTitle: e.itineraryItem.title }
+          : {}),
       })),
     [expenses]
   );
 
-  const allEntries = useMemo<BudgetEntry[]>(
-    () => [
-      ...actualEntries.slice().sort((a, b) => b.sortKey.getTime() - a.sortKey.getTime()),
-      ...plannedEntries,
-    ],
-    [actualEntries, plannedEntries]
+  const sortedEntries = useMemo(
+    () => actualEntries.slice().sort((a, b) => b.sortKey.getTime() - a.sortKey.getTime()),
+    [actualEntries]
   );
 
   const breakdown = useMemo(
     () =>
       CATEGORIES.map((cat) => ({
         category: cat,
-        amount:
-          expenses.filter((e) => e.category === cat).reduce((s, e) => s + e.amountCents, 0) +
-          plannedEntries.filter((p) => p.category === cat).reduce((s, p) => s + p.amountCents, 0),
+        amount: expenses.filter((e) => e.category === cat).reduce((s, e) => s + e.amountCents, 0),
       })).filter((s) => s.amount > 0),
-    [expenses, plannedEntries]
+    [expenses]
   );
 
   const totalForDonut = useMemo(() => breakdown.reduce((s, b) => s + b.amount, 0), [breakdown]);
 
   const { actualCents, uniqueCurrencies } = useMemo(() => {
     const actualCents = expenses.reduce((s, e) => s + e.amountCents, 0);
-    const uniqueCurrencies = [...new Set([
-      ...expenses.map((e) => e.currency),
-      ...plannedEntries.map((p) => p.currency),
-    ])];
+    const uniqueCurrencies = [...new Set(expenses.map((e) => e.currency))];
     return { actualCents, uniqueCurrencies };
-  }, [expenses, plannedEntries]);
+  }, [expenses]);
 
   const isMixed = uniqueCurrencies.length > 1;
   const singleCurrency = uniqueCurrencies[0] ?? budgetCurrency;
 
-  // Per-currency breakdown used when isMixed — never mixes units
   const currencyBreakdown = useMemo(
     () =>
       uniqueCurrencies.map((cur) => {
         const curExpenses = expenses.filter((e) => e.currency === cur);
-        const curItems = plannedEntries.filter((p) => p.currency === cur);
-        const total =
-          curExpenses.reduce((s, e) => s + e.amountCents, 0) +
-          curItems.reduce((s, p) => s + p.amountCents, 0);
+        const total = curExpenses.reduce((s, e) => s + e.amountCents, 0);
         const cats = CATEGORIES.map((cat) => ({
           category: cat,
-          amount:
-            curExpenses.filter((e) => e.category === cat).reduce((s, e) => s + e.amountCents, 0) +
-            curItems.filter((p) => p.category === cat).reduce((s, p) => s + p.amountCents, 0),
+          amount: curExpenses.filter((e) => e.category === cat).reduce((s, e) => s + e.amountCents, 0),
         })).filter((c) => c.amount > 0);
         return { currency: cur, total, cats };
       }),
-    [uniqueCurrencies, expenses, plannedEntries]
+    [uniqueCurrencies, expenses]
   );
 
   function saveBudget() {
@@ -562,12 +518,10 @@ export function BudgetTab({ tripId, userId, members, itineraryItems, budgetCents
               {currencyBreakdown.map(({ currency: cur, total, cats }, idx) => (
                 <div key={cur}>
                   {idx > 0 && <div className="border-t border-[#F0EDE8] pt-4" />}
-                  {/* Currency header */}
                   <div className="flex items-center justify-between mb-2">
                     <span className="text-[13px] font-semibold text-[#6B6560]">{cur}</span>
                     <span className="text-[15px] font-bold text-[#1A1512]">{formatCurrency(total, cur)}</span>
                   </div>
-                  {/* Stacked bar — proportions within this currency only */}
                   {cats.length > 0 && (
                     <div className="h-1.5 bg-[#F0EDE8] rounded-full overflow-hidden flex mb-2.5">
                       {cats.map(({ category, amount }) => (
@@ -581,7 +535,6 @@ export function BudgetTab({ tripId, userId, members, itineraryItems, budgetCents
                       ))}
                     </div>
                   )}
-                  {/* Category rows */}
                   <div className="space-y-1.5">
                     {cats.map(({ category, amount }) => {
                       const meta = CATEGORY_META[category];
@@ -611,42 +564,12 @@ export function BudgetTab({ tripId, userId, members, itineraryItems, budgetCents
         </button>
 
         {/* Who paid log */}
-        {allEntries.length > 0 && (
+        {sortedEntries.length > 0 && (
           <div className="bg-white border border-[#E5E0DA] rounded-[16px] overflow-hidden">
             <p className="text-[14px] font-semibold text-[#1A1512] px-4 pt-4 pb-3">Who Paid</p>
             <div className="divide-y divide-[#F0EDE8]">
-              {allEntries.map((entry) => {
+              {sortedEntries.map((entry) => {
                 const meta = CATEGORY_META[entry.category] ?? CATEGORY_META.other;
-
-                if (entry.kind === "planned") {
-                  return (
-                    <div
-                      key={`planned-${entry.id}`}
-                      className="flex items-center gap-3 px-4 py-3 opacity-80 active:bg-[#F0EDE8] transition-colors cursor-pointer"
-                      onClick={() => setMarkingPaid(entry)}
-                    >
-                      <div
-                        className="w-9 h-9 rounded-full flex items-center justify-center text-base flex-shrink-0"
-                        style={{ backgroundColor: `${meta.color}20` }}
-                      >
-                        {meta.emoji}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-[13px] font-semibold text-[#1A1512] truncate">{entry.title}</p>
-                        <p className="text-[11px] text-[#A09B96]">Planned · tap to mark as paid</p>
-                      </div>
-                      <div className="flex items-center gap-1.5 flex-shrink-0">
-                        <span className="text-[13px] text-[#A09B96]">
-                          {formatCurrency(entry.amountCents, entry.currency)}
-                        </span>
-                        <span className="text-[10px] px-1.5 py-0.5 bg-[#F0EDE8] text-[#6B6560] rounded-full">
-                          Planned
-                        </span>
-                      </div>
-                    </div>
-                  );
-                }
-
                 const isOwn = entry.paidBy === userId;
                 return (
                   <SwipeableExpenseRow
@@ -663,11 +586,11 @@ export function BudgetTab({ tripId, userId, members, itineraryItems, budgetCents
           </div>
         )}
 
-        {allEntries.length === 0 && (
+        {sortedEntries.length === 0 && (
           <div className="flex flex-col items-center py-10 text-center">
             <span className="text-4xl mb-3">💸</span>
             <p className="text-[15px] font-semibold text-[#1A1512]">No expenses yet</p>
-            <p className="text-sm text-[#6B6560] mt-1">Track who paid for what during the trip</p>
+            <p className="text-sm text-[#6B6560] mt-1">Add expenses — optionally link them to plan items</p>
           </div>
         )}
       </div>
@@ -678,33 +601,12 @@ export function BudgetTab({ tripId, userId, members, itineraryItems, budgetCents
           mode="add"
           tripId={tripId}
           members={members}
+          itineraryItems={sortedItineraryItems}
           onSuccess={() => {
             setAddOpen(false);
             utils.budget.listByTrip.invalidate({ tripId });
           }}
         />
-      </BottomSheet>
-
-      <BottomSheet open={markingPaid !== null} onOpenChange={(open) => { if (!open) setMarkingPaid(null); }}>
-        <BottomSheetTitle>Mark as Paid</BottomSheetTitle>
-        {markingPaid && (
-          <ExpenseForm
-            mode="add"
-            tripId={tripId}
-            members={members}
-            itineraryItemId={markingPaid.id}
-            initialValues={{
-              title: markingPaid.title,
-              amountCents: markingPaid.amountCents,
-              currency: markingPaid.currency,
-              category: markingPaid.category,
-            }}
-            onSuccess={() => {
-              setMarkingPaid(null);
-              utils.budget.listByTrip.invalidate({ tripId });
-            }}
-          />
-        )}
       </BottomSheet>
 
       <BottomSheet open={editingExpense !== null} onOpenChange={(open) => { if (!open) setEditingExpense(null); }}>
@@ -721,6 +623,8 @@ export function BudgetTab({ tripId, userId, members, itineraryItems, budgetCents
               paidBy: editingExpense.paidBy,
             }}
             members={members}
+            itineraryItems={sortedItineraryItems}
+            {...(editingExpense.linkedItemId !== undefined ? { initialLinkedItemId: editingExpense.linkedItemId } : {})}
             onSuccess={() => {
               setEditingExpense(null);
               utils.budget.listByTrip.invalidate({ tripId });

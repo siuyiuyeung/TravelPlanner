@@ -103,10 +103,6 @@ function formatDayHeader(dateStr: string, dayIndex: number) {
   return { mono, readable };
 }
 
-function formatCost(cents: number) {
-  return (cents / 100).toLocaleString("en-US", { minimumFractionDigits: 0 });
-}
-
 function formatLegDist(km: number) {
   return km < 1 ? `${Math.round(km * 1000)} m` : `${km.toFixed(1)} km`;
 }
@@ -324,11 +320,6 @@ function ItemCard({
             {item.locationName && (
               <span className="inline-flex items-center px-2 py-0.5 bg-[#F0EDE8] rounded-full text-[10px] text-[#6B6560]">
                 📍 {item.locationName}
-              </span>
-            )}
-            {item.costCents != null && item.costCents > 0 && (
-              <span className="inline-flex items-center px-2 py-0.5 bg-[rgba(242,169,59,0.15)] rounded-full text-[10px] text-[#B8860B]">
-                ${formatCost(item.costCents)}
               </span>
             )}
           </div>
@@ -601,6 +592,7 @@ export function ItineraryTimeline({ items, tripId, userId, legDistances, legMode
           <EditItemForm
             item={editItem}
             tripId={tripId}
+            userId={userId}
             onSuccess={() => {
               setEditItem(null);
               utils.trips.getById.invalidate({ tripId });

@@ -7,7 +7,7 @@ import { api } from "@/lib/trpc/client";
 import type { AppRouter } from "@/server/routers/_app";
 import type { inferRouterOutputs } from "@trpc/server";
 import { BottomSheet, BottomSheetTitle } from "@/components/ui/bottom-sheet";
-import { formatCurrency, timeAgo } from "@/lib/utils";
+import { timeAgo } from "@/lib/utils";
 import { AddItemForm } from "./AddItemForm";
 import { ItineraryTimeline } from "./ItineraryTimeline";
 import { CommentThread } from "./CommentThread";
@@ -154,6 +154,7 @@ export function TripDetailClient({ tripId, userId }: Props) {
   const [tab, setTab] = useState<"overview" | "itinerary" | "map" | "budget" | "pack" | "chat">("overview");
   const [addItemOpen, setAddItemOpen] = useState(false);
   const [mapSelectedId, setMapSelectedId] = useState<string | null>(null);
+  const [mapDay, setMapDay] = useState<string | null>(null);
   const [routeData, setRouteData] = useState<RouteData | null>(null);
   const [legModes, setLegModes] = useState<Record<string, RouteMode>>({});
   const [legDistances, setLegDistances] = useState<Record<string, number>>({});
@@ -198,8 +199,17 @@ export function TripDetailClient({ tripId, userId }: Props) {
     return () => es.close();
   }, [tripId, utils]);
 
-  // Sort pinned items the same way the plan view does (startTime → sortOrder)
-  const pinnedItems = [...(trip?.itineraryItems ?? [])]
+  function toDateKey(t: Date | string | null): string | null {
+    if (!t) return null;
+    const d = new Date(t);
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, "0");
+    const day = String(d.getDate()).padStart(2, "0");
+    return `${y}-${m}-${day}`;
+  }
+
+  // All items with coordinates, sorted (markers — includes unscheduled)
+  const allPinnedItems = [...(trip?.itineraryItems ?? [])]
     .sort((a, b) => {
       const aTime = a.startTime ? new Date(a.startTime).getTime() : null;
       const bTime = b.startTime ? new Date(b.startTime).getTime() : null;
@@ -209,21 +219,54 @@ export function TripDetailClient({ tripId, userId }: Props) {
       return a.sortOrder - b.sortOrder;
     })
     .filter((i) => i.locationLat !== null && i.locationLng !== null);
-  const posKey = pinnedItems.map((i) => `${i.locationLat},${i.locationLng}`).join("|");
+
+  // Day numbering consistent with Plan tab (derived from ALL items, not just pinned)
+  const allDates = [...new Set(
+    (trip?.itineraryItems ?? [])
+      .filter(i => i.startTime !== null)
+      .map(i => toDateKey(i.startTime))
+      .filter((d): d is string => d !== null)
+  )].sort();
+  const dayIndexMap = new Map(allDates.map((d, i) => [d, i + 1]));
+
+  const pinnedDates = [...new Set(
+    allPinnedItems
+      .filter(i => i.startTime !== null)
+      .map(i => toDateKey(i.startTime))
+      .filter((d): d is string => d !== null)
+  )].sort();
+  const hasUnscheduledPinned = allPinnedItems.some(i => i.startTime === null);
+  const showMapFilter = pinnedDates.length + (hasUnscheduledPinned ? 1 : 0) > 1;
+  const mapChips: { key: string | null; label: string }[] = [
+    { key: null, label: "All" },
+    ...pinnedDates.map(d => ({ key: d, label: `Day ${dayIndexMap.get(d) ?? "?"}` })),
+    ...(hasUnscheduledPinned ? [{ key: "__none__", label: "Unscheduled" }] : []),
+  ];
+
+  // Filtered items for map markers
+  const mapFilteredPinnedItems =
+    mapDay === null ? allPinnedItems :
+    mapDay === "__none__" ? allPinnedItems.filter(i => i.startTime === null) :
+    allPinnedItems.filter(i => toDateKey(i.startTime) === mapDay);
+
+  // Only scheduled items participate in route computation
+  const scheduledPinnedItems = mapFilteredPinnedItems.filter(i => i.startTime !== null);
+
+  const posKey = scheduledPinnedItems.map((i) => `${i.locationLat},${i.locationLng}`).join("|");
 
   useEffect(() => {
-    if (pinnedItems.length < 2) {
+    if (scheduledPinnedItems.length < 2) {
       setRouteData(null);
       setLegDistances({});
       setLegModes({});
       setLegCoords({});
       return;
     }
-    const legs = pinnedItems.slice(0, -1);
+    const legs = scheduledPinnedItems.slice(0, -1);
     Promise.all(
       legs.map(async (item, i) => {
         const from = item;
-        const to = pinnedItems[i + 1]!;
+        const to = scheduledPinnedItems[i + 1]!;
         const coordStr = `${from.locationLng},${from.locationLat};${to.locationLng},${to.locationLat}`;
         const itemMode = (item.routeMode ?? "driving") as RouteMode;
         const profile = MAPBOX_PROFILE[itemMode];
@@ -264,10 +307,10 @@ export function TripDetailClient({ tripId, userId }: Props) {
   const handleLegModeChange = useCallback(async (itemId: string, mode: RouteMode) => {
     setLegModes((prev) => ({ ...prev, [itemId]: mode }));
     updateItem.mutate({ itemId, tripId, routeMode: mode });
-    const idx = pinnedItems.findIndex((i) => i.id === itemId);
-    if (idx === -1 || idx >= pinnedItems.length - 1) return;
-    const from = pinnedItems[idx]!;
-    const to = pinnedItems[idx + 1]!;
+    const idx = scheduledPinnedItems.findIndex((i) => i.id === itemId);
+    if (idx === -1 || idx >= scheduledPinnedItems.length - 1) return;
+    const from = scheduledPinnedItems[idx]!;
+    const to = scheduledPinnedItems[idx + 1]!;
     const coordStr = `${from.locationLng},${from.locationLat};${to.locationLng},${to.locationLat}`;
     const profile = MAPBOX_PROFILE[mode];
     try {
@@ -287,16 +330,16 @@ export function TripDetailClient({ tripId, userId }: Props) {
       // keep existing values on error
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pinnedItems]);
+  }, [scheduledPinnedItems]);
 
   // Stitch per-leg geometries into one polyline for the map
   const combinedPolyline = useMemo(() => {
-    if (pinnedItems.length < 2) return [];
-    const legs = pinnedItems.slice(0, -1);
+    if (scheduledPinnedItems.length < 2) return [];
+    const legs = scheduledPinnedItems.slice(0, -1);
     const allPresent = legs.every((item) => (legCoords[item.id]?.length ?? 0) > 0);
     if (allPresent) return legs.flatMap((item) => legCoords[item.id] ?? []);
     return routeData?.coords ?? [];
-  }, [pinnedItems, legCoords, routeData]);
+  }, [scheduledPinnedItems, legCoords, routeData]);
 
   // Pull-to-refresh
   const handleRefresh = useCallback(async () => {
@@ -320,15 +363,6 @@ export function TripDetailClient({ tripId, userId }: Props) {
 
   const gradient = getGradient(trip.id);
 
-  const costItems = trip.itineraryItems.filter((i) => (i.costCents ?? 0) > 0);
-  const allSameCurrency = costItems.every((i) => i.currency === costItems[0]?.currency);
-  const totalCostCents = costItems.reduce((s, i) => s + (i.costCents ?? 0), 0);
-  const costStat =
-    costItems.length === 0
-      ? "—"
-      : allSameCurrency
-      ? formatCurrency(totalCostCents, costItems[0]!.currency ?? "USD")
-      : `${costItems.length} item${costItems.length !== 1 ? "s" : ""}`;
   const totalDistKm = Object.values(legDistances).reduce((s, km) => s + km, 0);
   const distStat =
     totalDistKm === 0
@@ -426,18 +460,11 @@ export function TripDetailClient({ tripId, userId }: Props) {
               ))}
             </div>
 
-            {/* Cost + Distance stats */}
-            <div className="grid grid-cols-2 gap-3">
-              {[
-                { icon: "💰", label: "Total Cost", value: costStat },
-                { icon: "📏", label: "Distance", value: distStat },
-              ].map(({ icon, label, value }) => (
-                <div key={label} className="bg-white border border-[#E5E0DA] rounded-[12px] p-3 text-center">
-                  <p className="text-xl">{icon}</p>
-                  <p className="text-[15px] font-bold text-[#1A1512] mt-1 truncate">{value}</p>
-                  <p className="text-[11px] text-[#A09B96]">{label}</p>
-                </div>
-              ))}
+            {/* Distance stat */}
+            <div className="bg-white border border-[#E5E0DA] rounded-[12px] p-3 text-center">
+              <p className="text-xl">📏</p>
+              <p className="text-[15px] font-bold text-[#1A1512] mt-1 truncate">{distStat}</p>
+              <p className="text-[11px] text-[#A09B96]">Distance</p>
             </div>
 
             {/* Next up */}
@@ -547,8 +574,28 @@ export function TripDetailClient({ tripId, userId }: Props) {
 
         {tab === "map" && (
           <>
+            {showMapFilter && (
+              <div
+                className="flex gap-2 px-4 py-2 bg-white overflow-x-auto shrink-0 border-b border-[#E5E0DA]"
+                style={{ scrollbarWidth: "none", WebkitOverflowScrolling: "touch" } as React.CSSProperties}
+              >
+                {mapChips.map(chip => (
+                  <button
+                    key={chip.key ?? "all"}
+                    onClick={() => setMapDay(mapDay === chip.key ? null : chip.key)}
+                    className={`flex-shrink-0 px-3.5 py-1.5 rounded-full text-[12px] font-semibold transition-colors ${
+                      mapDay === chip.key
+                        ? "bg-[#E8622A] text-white"
+                        : "bg-[#F0EDE8] text-[#6B6560]"
+                    }`}
+                  >
+                    {chip.label}
+                  </button>
+                ))}
+              </div>
+            )}
             <MapView
-              items={pinnedItems}
+              items={mapFilteredPinnedItems}
               onSelectItem={(id) => setMapSelectedId(id)}
               routeCoords={combinedPolyline}
               totalKm={Object.values(legDistances).reduce((s, km) => s + km, 0) || routeData?.totalKm}
@@ -581,11 +628,6 @@ export function TripDetailClient({ tripId, userId }: Props) {
                     )}
                     {item.description && (
                       <p className="text-sm text-[#1A1512]">{item.description}</p>
-                    )}
-                    {item.costCents != null && (
-                      <p className="text-sm text-[#1A1512]">
-                        💰 {new Intl.NumberFormat("en-US", { style: "currency", currency: item.currency ?? "HKD" }).format(item.costCents / 100)}
-                      </p>
                     )}
                     {item.url && (
                       <a

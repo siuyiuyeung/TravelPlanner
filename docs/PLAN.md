@@ -100,8 +100,9 @@ Beyond the base schema in `docs/DATABASE.md`:
 - [x] Currency picker (12 currencies) on each expense
 - [x] Member payer picker — record expense on behalf of another member
 - [x] Donut chart breakdown by category
-- [x] Itinerary items with a cost auto-appear as "Planned" entries in the budget
-- [x] Mark-as-paid workflow — convert a planned item to an actual expense
+- [x] Link any expense to a plan item via optional item picker in the expense form
+- [x] Add and manage multiple costs directly from an itinerary item's edit sheet ("Linked costs" section)
+- [x] Linked item name shown on expense cards in the budget list
 - [x] User-set trip budget target (stored on trip) with ✏️ inline edit
 - [x] "vs budget" delta row — green under, red over; hidden when currencies are mixed
 - [x] Mixed-currency handling — "mixed" label in donut centre, per-currency subtotals in legend

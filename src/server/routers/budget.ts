@@ -1,7 +1,7 @@
 import { TRPCError } from "@trpc/server";
 import { eq, and, desc } from "drizzle-orm";
 import { router, protectedProcedure, z } from "../trpc";
-import { trips, groupMembers, tripExpenses } from "../db/schema";
+import { trips, groupMembers, tripExpenses, itineraryItems } from "../db/schema";
 import { broadcastTripUpdate } from "../sse";
 
 async function assertTripMember(
@@ -27,6 +27,21 @@ export const budgetRouter = router({
       await assertTripMember(ctx.db as Parameters<typeof assertTripMember>[0], input.tripId, ctx.session.user.id);
       return ctx.db.query.tripExpenses.findMany({
         where: eq(tripExpenses.tripId, input.tripId),
+        with: { payer: true, itineraryItem: { columns: { id: true, title: true } } },
+        orderBy: [desc(tripExpenses.paidAt)],
+      });
+    }),
+
+  listByItem: protectedProcedure
+    .input(z.object({ itineraryItemId: z.string().uuid() }))
+    .query(async ({ ctx, input }) => {
+      const item = await ctx.db.query.itineraryItems.findFirst({
+        where: eq(itineraryItems.id, input.itineraryItemId),
+      }) as { tripId: string } | undefined;
+      if (!item) throw new TRPCError({ code: "NOT_FOUND" });
+      await assertTripMember(ctx.db as Parameters<typeof assertTripMember>[0], item.tripId, ctx.session.user.id);
+      return ctx.db.query.tripExpenses.findMany({
+        where: eq(tripExpenses.itineraryItemId, input.itineraryItemId),
         with: { payer: true },
         orderBy: [desc(tripExpenses.paidAt)],
       });
@@ -77,7 +92,7 @@ export const budgetRouter = router({
       currency: z.string().length(3).optional(),
       category: z.enum(CATEGORIES).optional(),
       paidByUserId: z.string().optional(),
-      itineraryItemId: z.string().uuid().optional(),
+      itineraryItemId: z.string().uuid().nullable().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       const expense = await ctx.db.query.tripExpenses.findFirst({
@@ -88,7 +103,6 @@ export const budgetRouter = router({
 
       const { expenseId, paidByUserId, ...rest } = input;
 
-      // Validate new payer if changing
       let newPaidBy: string | undefined;
       if (paidByUserId) {
         const trip = await ctx.db.query.trips.findFirst({ where: eq(trips.id, expense.tripId) }) as { groupId: string } | undefined;
@@ -116,7 +130,6 @@ export const budgetRouter = router({
         where: eq(tripExpenses.id, input.expenseId),
       });
       if (!expense) throw new TRPCError({ code: "NOT_FOUND" });
-      // Only the payer can delete their own expense
       if (expense.paidBy !== ctx.session.user.id) throw new TRPCError({ code: "FORBIDDEN" });
       await ctx.db.delete(tripExpenses).where(eq(tripExpenses.id, input.expenseId));
       broadcastTripUpdate(expense.tripId);

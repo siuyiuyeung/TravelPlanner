@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import { api } from "@/lib/trpc/client";
-import { parseCents } from "@/lib/utils";
 import { LocationAutocomplete } from "./LocationAutocomplete";
 
 type Props = {
@@ -29,8 +28,6 @@ export function AddItemForm({ tripId, onSuccess }: Props) {
   const [location, setLocation] = useState("");
   const [locationLat, setLocationLat] = useState<string | undefined>();
   const [locationLng, setLocationLng] = useState<string | undefined>();
-  const [cost, setCost] = useState("");
-  const [currency, setCurrency] = useState("HKD");
   const [description, setDescription] = useState("");
   const [error, setError] = useState("");
 
@@ -48,9 +45,6 @@ export function AddItemForm({ tripId, onSuccess }: Props) {
     setError("");
     if (!title.trim()) { setError("Title is required"); return; }
 
-    const costCents = cost ? parseCents(cost) : undefined;
-
-    // Combine date + time into ISO datetime string for startTime
     let startTime: string | undefined;
     if (date) {
       startTime = time ? new Date(`${date}T${time}:00`).toISOString() : new Date(`${date}T00:00:00`).toISOString();
@@ -64,8 +58,6 @@ export function AddItemForm({ tripId, onSuccess }: Props) {
       locationName: location.trim() || undefined,
       locationLat,
       locationLng,
-      costCents: costCents && !isNaN(costCents) ? costCents : undefined,
-      currency: cost ? currency : undefined,
       description: description.trim() || undefined,
     });
   }
@@ -134,31 +126,6 @@ export function AddItemForm({ tripId, onSuccess }: Props) {
               setLocationLng(lng);
             }}
           />
-        </div>
-
-        <div>
-          <label className="block text-xs font-semibold text-[#6B6560] mb-1">Cost</label>
-          <div className="flex gap-2">
-            <select
-              value={currency}
-              onChange={(e) => setCurrency(e.target.value)}
-              className="px-2.5 py-3 bg-[#F0EDE8] border border-[#E5E0DA] rounded-[10px] text-[15px] text-[#1A1512] focus:outline-none focus:border-[#E8622A] flex-shrink-0"
-            >
-              {["HKD","USD","EUR","GBP","JPY","CNY","AUD","CAD","CHF","INR","SGD","MXN"].map((c) => (
-                <option key={c} value={c}>{c}</option>
-              ))}
-            </select>
-            <input
-              type="number"
-              inputMode="decimal"
-              value={cost}
-              onChange={(e) => setCost(e.target.value)}
-              placeholder="0.00"
-              min="0"
-              step="0.01"
-              className="flex-1 px-4 py-3 bg-[#F0EDE8] border border-[#E5E0DA] rounded-[10px] text-[16px] text-[#1A1512] placeholder:text-[#A09B96] focus:outline-none focus:border-[#E8622A]"
-            />
-          </div>
         </div>
 
         <div>
