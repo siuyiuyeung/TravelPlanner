@@ -442,7 +442,7 @@ export function TripDetailClient({ tripId, userId }: Props) {
       </div>
 
       {/* Content */}
-      <div style={tab === "map" ? { flex: 1, display: "flex", flexDirection: "column", minHeight: 0, overflow: "hidden" } : undefined} className={tab === "map" ? "" : tab === "chat" ? "flex-1 flex flex-col overflow-hidden pb-0" : "flex-1 px-5 py-5 pb-28"}>
+      <div style={tab === "map" ? { flex: 1, position: "relative", display: "flex", flexDirection: "column", minHeight: 0, overflow: "hidden" } : undefined} className={tab === "map" ? "" : tab === "chat" ? "flex-1 flex flex-col overflow-hidden pb-0" : "flex-1 px-5 py-5 pb-28"}>
         {tab === "overview" && (
           <div className="space-y-4">
             {/* Quick stats */}
@@ -574,19 +574,26 @@ export function TripDetailClient({ tripId, userId }: Props) {
 
         {tab === "map" && (
           <>
+            <MapView
+              items={mapFilteredPinnedItems}
+              onSelectItem={(id) => setMapSelectedId(id)}
+              routeCoords={combinedPolyline}
+              totalKm={Object.values(legDistances).reduce((s, km) => s + km, 0) || routeData?.totalKm}
+            />
             {showMapFilter && (
               <div
-                className="flex gap-2 px-4 py-2 bg-white overflow-x-auto shrink-0 border-b border-[#E5E0DA]"
-                style={{ scrollbarWidth: "none", WebkitOverflowScrolling: "touch" } as React.CSSProperties}
+                style={{ position: "absolute", top: 12, left: 0, right: 0, zIndex: 10, pointerEvents: "none" } as React.CSSProperties}
+                className="flex gap-2 px-4 overflow-x-auto"
               >
                 {mapChips.map(chip => (
                   <button
                     key={chip.key ?? "all"}
                     onClick={() => setMapDay(mapDay === chip.key ? null : chip.key)}
-                    className={`flex-shrink-0 px-3.5 py-1.5 rounded-full text-[12px] font-semibold transition-colors ${
+                    style={{ pointerEvents: "auto" }}
+                    className={`flex-shrink-0 px-3.5 py-1.5 rounded-full text-[12px] font-semibold transition-colors shadow-sm ${
                       mapDay === chip.key
                         ? "bg-[#E8622A] text-white"
-                        : "bg-[#F0EDE8] text-[#6B6560]"
+                        : "bg-white/90 text-[#6B6560]"
                     }`}
                   >
                     {chip.label}
@@ -594,12 +601,6 @@ export function TripDetailClient({ tripId, userId }: Props) {
                 ))}
               </div>
             )}
-            <MapView
-              items={mapFilteredPinnedItems}
-              onSelectItem={(id) => setMapSelectedId(id)}
-              routeCoords={combinedPolyline}
-              totalKm={Object.values(legDistances).reduce((s, km) => s + km, 0) || routeData?.totalKm}
-            />
             <BottomSheet
               open={mapSelectedId !== null}
               onOpenChange={(open) => { if (!open) setMapSelectedId(null); }}
