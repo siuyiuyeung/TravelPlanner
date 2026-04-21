@@ -148,6 +148,60 @@ function LocateControl({
   );
 }
 
+function ItemChips({
+  pinned,
+  positions,
+}: {
+  pinned: MapItem[];
+  positions: [number, number][];
+}) {
+  const map = useMap();
+  if (pinned.length === 0) return null;
+
+  return (
+    <div
+      style={{
+        position: "absolute",
+        bottom: 72,
+        left: 0,
+        right: 0,
+        zIndex: 1000,
+        pointerEvents: "auto",
+        display: "flex",
+        overflowX: "auto",
+        WebkitOverflowScrolling: "touch",
+        padding: "0 12px",
+        gap: 8,
+        scrollbarWidth: "none",
+      } as React.CSSProperties}
+    >
+      {pinned.map((item, idx) => {
+        const pos = positions[idx]!;
+        const emoji = ITEM_EMOJI[item.type] ?? "📌";
+        return (
+          <button
+            key={item.id}
+            style={{ flexShrink: 0 }}
+            onClick={(e) => {
+              map.flyTo(pos, 16, { animate: true });
+              e.currentTarget.scrollIntoView({ behavior: "smooth", inline: "center", block: "nearest" });
+            }}
+            className="w-[112px] flex items-center gap-1.5 px-2.5 py-1.5 rounded-full bg-white/90 backdrop-blur-sm shadow-sm text-[#1A1512] border border-white/60 overflow-hidden"
+          >
+            <span className="text-[10px] font-mono font-bold text-[#A09B96] leading-none flex-shrink-0">
+              {idx + 1}
+            </span>
+            <span className="text-[13px] leading-none flex-shrink-0">{emoji}</span>
+            <span className="text-[12px] font-semibold truncate min-w-0 flex-1">
+              {item.title}
+            </span>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
 function FitBounds({ positions }: { positions: [number, number][] }) {
   const map = useMap();
   const fitted = useRef(false);
@@ -236,6 +290,7 @@ export function MapViewInner({ items, onSelectItem, routeCoords, totalKm }: Prop
         />
         <FitBounds positions={positions} />
         <LocateControl onLocate={setUserPos} />
+        <ItemChips pinned={pinned} positions={positions} />
 
         {/* User location dot */}
         {userPos && (
