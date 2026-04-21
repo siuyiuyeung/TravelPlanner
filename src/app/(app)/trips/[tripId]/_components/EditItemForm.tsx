@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { api } from "@/lib/trpc/client";
+import { parseCents } from "@/lib/utils";
 import { LocationAutocomplete } from "./LocationAutocomplete";
 
 type ItineraryItem = {
@@ -74,7 +75,7 @@ export function EditItemForm({ item, onSuccess, onDelete }: Props) {
     setError("");
     if (!title.trim()) { setError("Title is required"); return; }
 
-    const costCents = cost ? Math.round(parseFloat(cost) * 100) : undefined;
+    const costCents = cost ? parseCents(cost) : undefined;
     let startTime: string | undefined;
     if (date) {
       startTime = time

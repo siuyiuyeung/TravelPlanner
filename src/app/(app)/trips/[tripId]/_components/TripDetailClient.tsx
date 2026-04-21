@@ -7,7 +7,7 @@ import { api } from "@/lib/trpc/client";
 import type { AppRouter } from "@/server/routers/_app";
 import type { inferRouterOutputs } from "@trpc/server";
 import { BottomSheet, BottomSheetTitle } from "@/components/ui/bottom-sheet";
-import { formatCurrency } from "@/lib/utils";
+import { formatCurrency, timeAgo } from "@/lib/utils";
 import { AddItemForm } from "./AddItemForm";
 import { ItineraryTimeline } from "./ItineraryTimeline";
 import { CommentThread } from "./CommentThread";
@@ -487,15 +487,6 @@ export function TripDetailClient({ tripId, userId }: Props) {
               activities.sort((a, b) => b.time.getTime() - a.time.getTime());
               const recent = activities.slice(0, 5);
               if (recent.length === 0) return null;
-
-              function timeAgo(d: Date) {
-                const mins = Math.floor((Date.now() - d.getTime()) / 60_000);
-                if (mins < 1) return "just now";
-                if (mins < 60) return `${mins}m ago`;
-                const hrs = Math.floor(mins / 60);
-                if (hrs < 24) return `${hrs}h ago`;
-                return `${Math.floor(hrs / 24)}d ago`;
-              }
 
               return (
                 <div className="bg-white border border-[#E5E0DA] rounded-[16px] p-4">

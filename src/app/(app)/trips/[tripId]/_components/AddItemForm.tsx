@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { api } from "@/lib/trpc/client";
+import { parseCents } from "@/lib/utils";
 import { LocationAutocomplete } from "./LocationAutocomplete";
 
 type Props = {
@@ -47,7 +48,7 @@ export function AddItemForm({ tripId, onSuccess }: Props) {
     setError("");
     if (!title.trim()) { setError("Title is required"); return; }
 
-    const costCents = cost ? Math.round(parseFloat(cost) * 100) : undefined;
+    const costCents = cost ? parseCents(cost) : undefined;
 
     // Combine date + time into ISO datetime string for startTime
     let startTime: string | undefined;

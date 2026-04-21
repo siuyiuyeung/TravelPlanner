@@ -1,10 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { api } from "@/lib/trpc/client";
 import { useSwipeToDelete } from "@/hooks/use-swipe-to-delete";
 import { BottomSheet, BottomSheetTitle } from "@/components/ui/bottom-sheet";
-import { formatCurrency } from "@/lib/utils";
+import { formatCurrency, parseCents, timeAgo } from "@/lib/utils";
 
 type Category = "food" | "transport" | "accommodation" | "activity" | "other";
 
@@ -35,6 +35,12 @@ const SUPPORTED_CURRENCIES = [
 
 type CurrencyCode = typeof SUPPORTED_CURRENCIES[number]["code"];
 
+const DEFAULT_CURRENCY: CurrencyCode = "HKD";
+const VALID_CURRENCY_CODES: Set<string> = new Set(SUPPORTED_CURRENCIES.map((c) => c.code));
+function toValidCurrency(code: string | null | undefined): CurrencyCode {
+  return VALID_CURRENCY_CODES.has(code ?? "") ? (code as CurrencyCode) : DEFAULT_CURRENCY;
+}
+
 const ITEM_TYPE_TO_CATEGORY: Record<string, Category> = {
   flight:     "transport",
   hotel:      "accommodation",
@@ -43,8 +49,6 @@ const ITEM_TYPE_TO_CATEGORY: Record<string, Category> = {
   transport:  "transport",
   note:       "other",
 };
-
-// ── Types ─────────────────────────────────────────────────────────────────────
 
 type Member = { userId: string; user: { id: string; name: string } };
 
@@ -78,8 +82,6 @@ type ActualEntry = {
 };
 
 type BudgetEntry = PlannedEntry | ActualEntry;
-
-// ── SVG Donut chart ───────────────────────────────────────────────────────────
 
 function DonutChart({ segments, total }: { segments: { category: Category; amount: number }[]; total: number }) {
   const SIZE = 140;
@@ -122,8 +124,6 @@ function DonutChart({ segments, total }: { segments: { category: Category; amoun
   );
 }
 
-// ── Expense Form (add + edit) ─────────────────────────────────────────────────
-
 type ExpenseFormProps =
   | { mode: "add"; tripId: string; members: Member[]; itineraryItemId?: string; initialValues?: { title: string; amountCents: number; currency: string; category: Category }; onSuccess: () => void }
   | { mode: "edit"; expenseId: string; initial: { title: string; amountCents: number; currency: string; category: Category; paidBy: string }; members: Member[]; onSuccess: () => void };
@@ -132,11 +132,7 @@ function ExpenseForm(props: ExpenseFormProps) {
   const init = props.mode === "edit" ? props.initial : (props.mode === "add" ? props.initialValues : null);
   const [title, setTitle] = useState(init?.title ?? "");
   const [amount, setAmount] = useState(init ? String(init.amountCents / 100) : "");
-  const [currency, setCurrency] = useState<CurrencyCode>(
-    SUPPORTED_CURRENCIES.some((c) => c.code === (init?.currency ?? "HKD"))
-      ? ((init?.currency ?? "HKD") as CurrencyCode)
-      : "HKD"
-  );
+  const [currency, setCurrency] = useState<CurrencyCode>(toValidCurrency(init?.currency));
   const [category, setCategory] = useState<Category>(init?.category ?? "other");
   const [paidByUserId, setPaidBy] = useState<string>(
     props.mode === "edit" ? (props.initial.paidBy ?? "") : ""
@@ -148,7 +144,7 @@ function ExpenseForm(props: ExpenseFormProps) {
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    const cents = Math.round(parseFloat(amount) * 100);
+    const cents = parseCents(amount);
     if (!title.trim() || isNaN(cents) || cents <= 0) return;
     if (props.mode === "edit") {
       update.mutate({
@@ -264,8 +260,6 @@ function ExpenseForm(props: ExpenseFormProps) {
   );
 }
 
-// ── Main component ────────────────────────────────────────────────────────────
-
 type Props = {
   tripId: string;
   userId: string;
@@ -274,15 +268,6 @@ type Props = {
   budgetCents: number;
   budgetCurrency: string;
 };
-
-function timeAgo(d: Date | string) {
-  const mins = Math.floor((Date.now() - new Date(d).getTime()) / 60_000);
-  if (mins < 1) return "just now";
-  if (mins < 60) return `${mins}m ago`;
-  const hrs = Math.floor(mins / 60);
-  if (hrs < 24) return `${hrs}h ago`;
-  return `${Math.floor(hrs / 24)}d ago`;
-}
 
 function SwipeableExpenseRow({
   entry,
@@ -344,11 +329,7 @@ export function BudgetTab({ tripId, userId, members, itineraryItems, budgetCents
   const [markingPaid, setMarkingPaid] = useState<PlannedEntry | null>(null);
   const [editingBudget, setEditingBudget] = useState(false);
   const [budgetInput, setBudgetInput] = useState("");
-  const [budgetCurInput, setBudgetCurInput] = useState<CurrencyCode>(
-    SUPPORTED_CURRENCIES.some((c) => c.code === budgetCurrency)
-      ? (budgetCurrency as CurrencyCode)
-      : "HKD"
-  );
+  const [budgetCurInput, setBudgetCurInput] = useState<CurrencyCode>(toValidCurrency(budgetCurrency));
 
   const utils = api.useUtils();
   const { data: expenses = [] } = api.budget.listByTrip.useQuery({ tripId });
@@ -364,85 +345,98 @@ export function BudgetTab({ tripId, userId, members, itineraryItems, budgetCents
     },
   });
 
-  // ── Unified entry list ─────────────────────────────────────────────────────
-
   // Items that already have a linked expense are shown as actuals — exclude from planned
-  const paidItemIds = new Set(expenses.map((e) => e.itineraryItemId).filter(Boolean));
+  const paidItemIds = useMemo(
+    () => new Set(expenses.map((e) => e.itineraryItemId).filter(Boolean)),
+    [expenses]
+  );
 
-  const plannedEntries: PlannedEntry[] = itineraryItems
-    .filter((i) => (i.costCents ?? 0) > 0 && !paidItemIds.has(i.id))
-    .map((i) => ({
-      kind: "planned",
-      id: i.id,
-      title: i.title,
-      category: ITEM_TYPE_TO_CATEGORY[i.type] ?? "other",
-      amountCents: i.costCents!,
-      currency: i.currency ?? "HKD",
-    }));
-
-  const actualEntries: ActualEntry[] = expenses.map((e) => ({
-    kind: "actual",
-    id: e.id,
-    title: e.title,
-    category: e.category as Category,
-    amountCents: e.amountCents,
-    currency: e.currency,
-    payerName: e.payer.name,
-    paidBy: e.paidBy,
-    sortKey: new Date(e.paidAt),
-  }));
-
-  const allEntries: BudgetEntry[] = [
-    ...actualEntries.sort((a, b) => b.sortKey.getTime() - a.sortKey.getTime()),
-    ...plannedEntries,
-  ];
-
-  // ── Breakdown for donut (actuals + planned) ────────────────────────────────
-
-  const breakdown = CATEGORIES.map((cat) => ({
-    category: cat,
-    amount:
-      expenses.filter((e) => e.category === cat).reduce((s, e) => s + e.amountCents, 0) +
+  const plannedEntries = useMemo<PlannedEntry[]>(
+    () =>
       itineraryItems
-        .filter((i) => (i.costCents ?? 0) > 0 && !paidItemIds.has(i.id) && (ITEM_TYPE_TO_CATEGORY[i.type] ?? "other") === cat)
-        .reduce((s, i) => s + (i.costCents ?? 0), 0),
-  })).filter((s) => s.amount > 0);
+        .filter((i) => (i.costCents ?? 0) > 0 && !paidItemIds.has(i.id))
+        .map((i) => ({
+          kind: "planned",
+          id: i.id,
+          title: i.title,
+          category: ITEM_TYPE_TO_CATEGORY[i.type] ?? "other",
+          amountCents: i.costCents!,
+          currency: i.currency ?? DEFAULT_CURRENCY,
+        })),
+    [itineraryItems, paidItemIds]
+  );
 
-  const totalForDonut = breakdown.reduce((s, b) => s + b.amount, 0);
+  const actualEntries = useMemo<ActualEntry[]>(
+    () =>
+      expenses.map((e) => ({
+        kind: "actual",
+        id: e.id,
+        title: e.title,
+        category: e.category as Category,
+        amountCents: e.amountCents,
+        currency: e.currency,
+        payerName: e.payer.name,
+        paidBy: e.paidBy,
+        sortKey: new Date(e.paidAt),
+      })),
+    [expenses]
+  );
 
-  // ── Currency detection ─────────────────────────────────────────────────────
+  const allEntries = useMemo<BudgetEntry[]>(
+    () => [
+      ...actualEntries.slice().sort((a, b) => b.sortKey.getTime() - a.sortKey.getTime()),
+      ...plannedEntries,
+    ],
+    [actualEntries, plannedEntries]
+  );
 
-  const actualCents = expenses.reduce((s, e) => s + e.amountCents, 0);
-  const allUsedCurrencies = [
-    ...expenses.map((e) => e.currency),
-    ...itineraryItems.filter((i) => (i.costCents ?? 0) > 0).map((i) => i.currency ?? "HKD"),
-  ];
-  const uniqueCurrencies = [...new Set(allUsedCurrencies)];
+  const breakdown = useMemo(
+    () =>
+      CATEGORIES.map((cat) => ({
+        category: cat,
+        amount:
+          expenses.filter((e) => e.category === cat).reduce((s, e) => s + e.amountCents, 0) +
+          plannedEntries.filter((p) => p.category === cat).reduce((s, p) => s + p.amountCents, 0),
+      })).filter((s) => s.amount > 0),
+    [expenses, plannedEntries]
+  );
+
+  const totalForDonut = useMemo(() => breakdown.reduce((s, b) => s + b.amount, 0), [breakdown]);
+
+  const { actualCents, uniqueCurrencies } = useMemo(() => {
+    const actualCents = expenses.reduce((s, e) => s + e.amountCents, 0);
+    const uniqueCurrencies = [...new Set([
+      ...expenses.map((e) => e.currency),
+      ...plannedEntries.map((p) => p.currency),
+    ])];
+    return { actualCents, uniqueCurrencies };
+  }, [expenses, plannedEntries]);
+
   const isMixed = uniqueCurrencies.length > 1;
   const singleCurrency = uniqueCurrencies[0] ?? budgetCurrency;
 
   // Per-currency breakdown used when isMixed — never mixes units
-  const currencyBreakdown = uniqueCurrencies.map((cur) => {
-    const curExpenses = expenses.filter((e) => e.currency === cur);
-    const curItems = itineraryItems.filter(
-      (i) => (i.costCents ?? 0) > 0 && !paidItemIds.has(i.id) && (i.currency ?? "HKD") === cur
-    );
-    const total =
-      curExpenses.reduce((s, e) => s + e.amountCents, 0) +
-      curItems.reduce((s, i) => s + (i.costCents ?? 0), 0);
-    const cats = CATEGORIES.map((cat) => ({
-      category: cat,
-      amount:
-        curExpenses.filter((e) => e.category === cat).reduce((s, e) => s + e.amountCents, 0) +
-        curItems
-          .filter((i) => (ITEM_TYPE_TO_CATEGORY[i.type] ?? "other") === cat)
-          .reduce((s, i) => s + (i.costCents ?? 0), 0),
-    })).filter((c) => c.amount > 0);
-    return { currency: cur, total, cats };
-  });
+  const currencyBreakdown = useMemo(
+    () =>
+      uniqueCurrencies.map((cur) => {
+        const curExpenses = expenses.filter((e) => e.currency === cur);
+        const curItems = plannedEntries.filter((p) => p.currency === cur);
+        const total =
+          curExpenses.reduce((s, e) => s + e.amountCents, 0) +
+          curItems.reduce((s, p) => s + p.amountCents, 0);
+        const cats = CATEGORIES.map((cat) => ({
+          category: cat,
+          amount:
+            curExpenses.filter((e) => e.category === cat).reduce((s, e) => s + e.amountCents, 0) +
+            curItems.filter((p) => p.category === cat).reduce((s, p) => s + p.amountCents, 0),
+        })).filter((c) => c.amount > 0);
+        return { currency: cur, total, cats };
+      }),
+    [uniqueCurrencies, expenses, plannedEntries]
+  );
 
   function saveBudget() {
-    const cents = Math.round(parseFloat(budgetInput) * 100);
+    const cents = parseCents(budgetInput);
     if (isNaN(cents) || cents < 0) return;
     updateTrip.mutate({ tripId, budgetCents: cents, budgetCurrency: budgetCurInput });
   }
@@ -458,11 +452,7 @@ export function BudgetTab({ tripId, userId, members, itineraryItems, budgetCents
             <button
               onClick={() => {
                 setBudgetInput(budgetCents > 0 ? String(budgetCents / 100) : "");
-                setBudgetCurInput(
-                  SUPPORTED_CURRENCIES.some((c) => c.code === budgetCurrency)
-                    ? (budgetCurrency as CurrencyCode)
-                    : "HKD"
-                );
+                setBudgetCurInput(toValidCurrency(budgetCurrency));
                 setEditingBudget(true);
               }}
               className="flex items-center gap-1 text-[11px] text-[#A09B96]"
@@ -657,7 +647,6 @@ export function BudgetTab({ tripId, userId, members, itineraryItems, budgetCents
                   );
                 }
 
-                // kind === "actual"
                 const isOwn = entry.paidBy === userId;
                 return (
                   <SwipeableExpenseRow
@@ -666,7 +655,7 @@ export function BudgetTab({ tripId, userId, members, itineraryItems, budgetCents
                     meta={meta}
                     isOwn={isOwn}
                     onEdit={() => setEditingExpense(entry)}
-                    onDelete={() => deleteExpense.mutate({ expenseId: entry.id })}
+                    onDelete={() => { if (!deleteExpense.isPending) deleteExpense.mutate({ expenseId: entry.id }); }}
                   />
                 );
               })}
