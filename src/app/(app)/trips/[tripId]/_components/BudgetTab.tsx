@@ -404,7 +404,7 @@ export function BudgetTab({ tripId, userId, members, itineraryItems, budgetCents
     amount:
       expenses.filter((e) => e.category === cat).reduce((s, e) => s + e.amountCents, 0) +
       itineraryItems
-        .filter((i) => (i.costCents ?? 0) > 0 && (ITEM_TYPE_TO_CATEGORY[i.type] ?? "other") === cat)
+        .filter((i) => (i.costCents ?? 0) > 0 && !paidItemIds.has(i.id) && (ITEM_TYPE_TO_CATEGORY[i.type] ?? "other") === cat)
         .reduce((s, i) => s + (i.costCents ?? 0), 0),
   })).filter((s) => s.amount > 0);
 
@@ -425,7 +425,7 @@ export function BudgetTab({ tripId, userId, members, itineraryItems, budgetCents
   const currencyBreakdown = uniqueCurrencies.map((cur) => {
     const curExpenses = expenses.filter((e) => e.currency === cur);
     const curItems = itineraryItems.filter(
-      (i) => (i.costCents ?? 0) > 0 && (i.currency ?? "HKD") === cur
+      (i) => (i.costCents ?? 0) > 0 && !paidItemIds.has(i.id) && (i.currency ?? "HKD") === cur
     );
     const total =
       curExpenses.reduce((s, e) => s + e.amountCents, 0) +
