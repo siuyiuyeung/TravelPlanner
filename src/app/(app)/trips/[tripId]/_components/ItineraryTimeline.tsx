@@ -24,13 +24,14 @@ type ItineraryItem = {
   votes: { userId: string; vote: VoteType }[];
 };
 
-type RouteMode = "driving" | "walking" | "cycling" | "transit";
+type RouteMode = "driving" | "walking" | "cycling" | "transit" | "none";
 
 const ROUTE_MODE_ICON: Record<RouteMode, string> = {
   driving: "🚗",
   walking: "🚶",
   cycling: "🚴",
   transit: "🚌",
+  none: "✕",
 };
 
 const MODES: { value: RouteMode; icon: string }[] = [
@@ -38,6 +39,7 @@ const MODES: { value: RouteMode; icon: string }[] = [
   { value: "walking", icon: "🚶" },
   { value: "cycling", icon: "🚴" },
   { value: "transit", icon: "🚌" },
+  { value: "none", icon: "✕" },
 ];
 
 type Props = {
@@ -385,9 +387,11 @@ function ItemCard({
               </button>
             ))}
           </div>
-          <span className="text-[11px] font-semibold text-[#A09B96] font-mono flex-shrink-0">
-            {ROUTE_MODE_ICON[legMode]} {formatLegDist(legKm)}
-          </span>
+          {legMode !== "none" && (
+            <span className="text-[11px] font-semibold text-[#A09B96] font-mono flex-shrink-0">
+              {ROUTE_MODE_ICON[legMode]} {formatLegDist(legKm)}
+            </span>
+          )}
           <div className="flex-1 border-t border-dashed border-[#E5E0DA]" />
         </div>
       )}

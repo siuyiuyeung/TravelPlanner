@@ -18,7 +18,7 @@ type MapItem = {
 type Props = {
   items: MapItem[];
   onSelectItem: (id: string) => void;
-  routeCoords: [number, number][];
+  routeSegments: [number, number][][];
   totalKm?: number | undefined;
 };
 
@@ -219,7 +219,7 @@ function FitBounds({ positions }: { positions: [number, number][] }) {
   return null;
 }
 
-export function MapViewInner({ items, onSelectItem, routeCoords, totalKm }: Props) {
+export function MapViewInner({ items, onSelectItem, routeSegments, totalKm }: Props) {
   const [userPos, setUserPos] = useState<[number, number] | null>(null);
 
   const pinned = items.filter(
@@ -308,11 +308,14 @@ export function MapViewInner({ items, onSelectItem, routeCoords, totalKm }: Prop
           </>
         )}
 
-        {routeCoords.length > 1 && (
-          <Polyline
-            positions={routeCoords}
-            pathOptions={{ color: "#E8622A", weight: 2.5, opacity: 0.6 }}
-          />
+        {routeSegments.map((seg, i) =>
+          seg.length > 1 && (
+            <Polyline
+              key={i}
+              positions={seg}
+              pathOptions={{ color: "#E8622A", weight: 2.5, opacity: 0.6 }}
+            />
+          )
         )}
 
         {pinned.map((item, idx) => {

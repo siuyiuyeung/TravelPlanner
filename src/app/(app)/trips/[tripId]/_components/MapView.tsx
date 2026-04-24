@@ -15,7 +15,7 @@ type MapItem = {
 type Props = {
   items: MapItem[];
   onSelectItem: (id: string) => void;
-  routeCoords: [number, number][];
+  routeSegments: [number, number][][];
   totalKm?: number | undefined;
 };
 
@@ -40,12 +40,12 @@ const MapViewInner = dynamic(
   }
 );
 
-export function MapView({ items, onSelectItem, routeCoords, totalKm }: Props) {
+export function MapView({ items, onSelectItem, routeSegments, totalKm }: Props) {
   return (
     // flex-1 grows to fill the tab content area; position:relative + absolute child gives Leaflet real px dimensions
     <div style={{ flex: 1, position: "relative", minHeight: 0, zIndex: 0 }}>
       <div style={{ position: "absolute", inset: 0 }}>
-        <MapViewInner items={items} onSelectItem={onSelectItem} routeCoords={routeCoords} totalKm={totalKm} />
+        <MapViewInner items={items} onSelectItem={onSelectItem} routeSegments={routeSegments} totalKm={totalKm} />
       </div>
     </div>
   );

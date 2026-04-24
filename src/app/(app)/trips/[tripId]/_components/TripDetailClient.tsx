@@ -134,10 +134,9 @@ function usePullToRefresh(onRefresh: () => Promise<void>) {
 
 const MAPBOX_TOKEN = process.env.NEXT_PUBLIC_MAPBOX_TOKEN ?? "";
 
-type RouteMode = "driving" | "walking" | "cycling" | "transit";
+type RouteMode = "driving" | "walking" | "cycling" | "transit" | "none";
 
-
-const MAPBOX_PROFILE: Record<RouteMode, string> = {
+const MAPBOX_PROFILE: Record<Exclude<RouteMode, "none">, string> = {
   driving: "driving",
   walking: "walking",
   cycling: "cycling",
@@ -265,35 +264,37 @@ export function TripDetailClient({ tripId, userId }: Props) {
     const legs = scheduledPinnedItems.slice(0, -1);
     Promise.all(
       legs.map(async (item, i) => {
-        const from = item;
         const to = scheduledPinnedItems[i + 1]!;
-        const coordStr = `${from.locationLng},${from.locationLat};${to.locationLng},${to.locationLat}`;
-        const itemMode = (item.routeMode ?? "driving") as RouteMode;
+        const isDayBoundary = toDateKey(item.startTime) !== toDateKey(to.startTime);
+        const defaultMode: RouteMode = isDayBoundary ? "none" : "driving";
+        const itemMode = (item.routeMode ?? defaultMode) as RouteMode;
+        if (itemMode === "none") {
+          return { id: item.id, mode: itemMode, distance: 0, coords: [] as [number, number][] };
+        }
+        const coordStr = `${item.locationLng},${item.locationLat};${to.locationLng},${to.locationLat}`;
         const profile = MAPBOX_PROFILE[itemMode];
         const r = await fetch(
           `https://api.mapbox.com/directions/v5/mapbox/${profile}/${coordStr}?geometries=geojson&overview=full&access_token=${MAPBOX_TOKEN}`
         );
         const data = (await r.json()) as { routes?: { distance: number; geometry: { coordinates: [number, number][] } }[] };
         const route = data.routes?.[0];
-        return { id: item.id, mode: itemMode, distance: route?.distance ?? 0, coords: route?.geometry.coordinates ?? [] };
+        return { id: item.id, mode: itemMode, distance: route?.distance ?? 0, coords: route?.geometry.coordinates ?? [] as [number, number][] };
       })
     ).then((results) => {
       const distances: Record<string, number> = {};
       const modes: Record<string, RouteMode> = {};
       const coords: Record<string, [number, number][]> = {};
-      let totalKm = 0;
       results.forEach((r) => {
         distances[r.id] = r.distance / 1000;
         modes[r.id] = r.mode;
         coords[r.id] = r.coords.map(([lng, lat]) => [lat, lng] as [number, number]);
-        totalKm += r.distance / 1000;
       });
       setLegDistances(distances);
       setLegModes(modes);
       setLegCoords(coords);
       setRouteData({
         coords: results.flatMap((r) => r.coords.map(([lng, lat]) => [lat, lng] as [number, number])),
-        totalKm,
+        totalKm: results.reduce((s, r) => s + r.distance / 1000, 0),
       });
     }).catch(() => {
       setRouteData(null);
@@ -309,6 +310,11 @@ export function TripDetailClient({ tripId, userId }: Props) {
     updateItem.mutate({ itemId, tripId, routeMode: mode });
     const idx = scheduledPinnedItems.findIndex((i) => i.id === itemId);
     if (idx === -1 || idx >= scheduledPinnedItems.length - 1) return;
+    if (mode === "none") {
+      setLegDistances((prev) => ({ ...prev, [itemId]: 0 }));
+      setLegCoords((prev) => ({ ...prev, [itemId]: [] }));
+      return;
+    }
     const from = scheduledPinnedItems[idx]!;
     const to = scheduledPinnedItems[idx + 1]!;
     const coordStr = `${from.locationLng},${from.locationLat};${to.locationLng},${to.locationLat}`;
@@ -332,14 +338,28 @@ export function TripDetailClient({ tripId, userId }: Props) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [scheduledPinnedItems]);
 
-  // Stitch per-leg geometries into one polyline for the map
-  const combinedPolyline = useMemo(() => {
+  // Split per-leg geometries into discrete polyline segments (gaps at "none" legs)
+  const routeSegments = useMemo(() => {
     if (scheduledPinnedItems.length < 2) return [];
     const legs = scheduledPinnedItems.slice(0, -1);
-    const allPresent = legs.every((item) => (legCoords[item.id]?.length ?? 0) > 0);
-    if (allPresent) return legs.flatMap((item) => legCoords[item.id] ?? []);
-    return routeData?.coords ?? [];
-  }, [scheduledPinnedItems, legCoords, routeData]);
+    const segments: [number, number][][] = [];
+    let current: [number, number][] = [];
+    for (const item of legs) {
+      const coords = legCoords[item.id] ?? [];
+      if (coords.length === 0) {
+        if (current.length > 0) { segments.push(current); current = []; }
+      } else {
+        current = [...current, ...coords];
+      }
+    }
+    if (current.length > 0) segments.push(current);
+    return segments;
+  }, [scheduledPinnedItems, legCoords]);
+
+  const totalKm = useMemo(
+    () => Object.values(legDistances).reduce((s, v) => s + v, 0),
+    [legDistances]
+  );
 
   // Pull-to-refresh
   const handleRefresh = useCallback(async () => {
@@ -577,8 +597,8 @@ export function TripDetailClient({ tripId, userId }: Props) {
             <MapView
               items={mapFilteredPinnedItems}
               onSelectItem={(id) => setMapSelectedId(id)}
-              routeCoords={combinedPolyline}
-              totalKm={Object.values(legDistances).reduce((s, km) => s + km, 0) || routeData?.totalKm}
+              routeSegments={routeSegments}
+              totalKm={totalKm || routeData?.totalKm}
             />
             {showMapFilter && (
               <div
