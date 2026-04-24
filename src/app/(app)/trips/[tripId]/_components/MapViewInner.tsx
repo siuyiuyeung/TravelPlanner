@@ -156,10 +156,19 @@ function ItemChips({
   positions: [number, number][];
 }) {
   const map = useMap();
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!containerRef.current) return;
+    L.DomEvent.disableScrollPropagation(containerRef.current);
+    L.DomEvent.disableClickPropagation(containerRef.current);
+  }, []);
+
   if (pinned.length === 0) return null;
 
   return (
     <div
+      ref={containerRef}
       style={{
         position: "absolute",
         bottom: 72,
