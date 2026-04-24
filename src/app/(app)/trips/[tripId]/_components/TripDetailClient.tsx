@@ -608,6 +608,8 @@ export function TripDetailClient({ tripId, userId }: Props) {
               onSelectItem={(id) => setMapSelectedId(id)}
               routeSegments={routeSegments}
               totalKm={totalKm || routeData?.totalKm}
+              legDistances={legDistances}
+              legDurations={legDurations}
             />
             {showMapFilter && (
               <div

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { MapContainer, TileLayer, Marker, Popup, Polyline, CircleMarker, useMap } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
@@ -20,7 +20,22 @@ type Props = {
   onSelectItem: (id: string) => void;
   routeSegments: [number, number][][];
   totalKm?: number | undefined;
+  legDistances?: Record<string, number> | undefined;
+  legDurations?: Record<string, number> | undefined;
 };
+
+function fmtDist(km: number) {
+  return km < 1 ? `${Math.round(km * 1000)}m` : `${km.toFixed(1)}km`;
+}
+
+function fmtDur(secs: number) {
+  const mins = Math.round(secs / 60);
+  if (mins < 1) return "<1m";
+  if (mins < 60) return `${mins}m`;
+  const h = Math.floor(mins / 60);
+  const m = mins % 60;
+  return m === 0 ? `${h}h` : `${h}h${m}m`;
+}
 
 const ITEM_EMOJI: Record<string, string> = {
   flight: "✈️",
@@ -151,9 +166,13 @@ function LocateControl({
 function ItemChips({
   pinned,
   positions,
+  legDistances,
+  legDurations,
 }: {
   pinned: MapItem[];
   positions: [number, number][];
+  legDistances?: Record<string, number> | undefined;
+  legDurations?: Record<string, number> | undefined;
 }) {
   const map = useMap();
   const containerRef = useRef<HTMLDivElement>(null);
@@ -177,34 +196,73 @@ function ItemChips({
         zIndex: 1000,
         pointerEvents: "auto",
         display: "flex",
+        alignItems: "center",
         overflowX: "auto",
         WebkitOverflowScrolling: "touch",
         padding: "0 12px",
-        gap: 8,
+        gap: 0,
         scrollbarWidth: "none",
       } as React.CSSProperties}
     >
       {pinned.map((item, idx) => {
         const pos = positions[idx]!;
         const emoji = ITEM_EMOJI[item.type] ?? "📌";
+        const legKm = legDistances?.[item.id];
+        const legSecs = legDurations?.[item.id];
+        const hasLeg = legKm !== undefined && legKm > 0;
+        const isLast = idx === pinned.length - 1;
         return (
-          <button
-            key={item.id}
-            style={{ flexShrink: 0 }}
-            onClick={(e) => {
-              map.flyTo(pos, 16, { animate: true });
-              e.currentTarget.scrollIntoView({ behavior: "smooth", inline: "center", block: "nearest" });
-            }}
-            className="w-[112px] flex items-center gap-1.5 px-2.5 py-1.5 rounded-full bg-white/90 backdrop-blur-sm shadow-sm text-[#1A1512] border border-white/60 overflow-hidden"
-          >
-            <span className="text-[10px] font-mono font-bold text-[#A09B96] leading-none flex-shrink-0">
-              {idx + 1}
-            </span>
-            <span className="text-[13px] leading-none flex-shrink-0">{emoji}</span>
-            <span className="text-[12px] font-semibold truncate min-w-0 flex-1">
-              {item.title}
-            </span>
-          </button>
+          <React.Fragment key={item.id}>
+            <button
+              style={{ flexShrink: 0 }}
+              onClick={(e) => {
+                map.flyTo(pos, 16, { animate: true });
+                e.currentTarget.scrollIntoView({ behavior: "smooth", inline: "center", block: "nearest" });
+              }}
+              className="w-[112px] flex items-center gap-1.5 px-2.5 py-1.5 rounded-full bg-white/90 backdrop-blur-sm shadow-sm text-[#1A1512] border border-white/60 overflow-hidden"
+            >
+              <span className="text-[10px] font-mono font-bold text-[#A09B96] leading-none flex-shrink-0">
+                {idx + 1}
+              </span>
+              <span className="text-[13px] leading-none flex-shrink-0">{emoji}</span>
+              <span className="text-[12px] font-semibold truncate min-w-0 flex-1">
+                {item.title}
+              </span>
+            </button>
+            {!isLast && (
+              <div style={{ flexShrink: 0, display: "flex", alignItems: "center", gap: 3, padding: "0 4px" }}>
+                <div style={{ width: 6, height: 1, background: "#C8C0B8" }} />
+                {hasLeg ? (
+                  <div
+                    style={{
+                      background: "rgba(255,255,255,0.88)",
+                      backdropFilter: "blur(4px)",
+                      border: "1px solid rgba(229,224,218,0.8)",
+                      borderRadius: 999,
+                      padding: "3px 6px",
+                      display: "flex",
+                      flexDirection: "column",
+                      alignItems: "center",
+                      gap: 1,
+                      flexShrink: 0,
+                    }}
+                  >
+                    <span style={{ fontSize: 9, fontFamily: "monospace", fontWeight: 700, color: "#6B6560", lineHeight: 1, whiteSpace: "nowrap" }}>
+                      {fmtDist(legKm!)}
+                    </span>
+                    {legSecs !== undefined && legSecs > 0 && (
+                      <span style={{ fontSize: 9, fontFamily: "monospace", fontWeight: 600, color: "#A09B96", lineHeight: 1, whiteSpace: "nowrap" }}>
+                        {fmtDur(legSecs)}
+                      </span>
+                    )}
+                  </div>
+                ) : (
+                  <div style={{ width: 16, height: 1, background: "#C8C0B8", borderTop: "1px dashed #C8C0B8" }} />
+                )}
+                <div style={{ width: 6, height: 1, background: "#C8C0B8" }} />
+              </div>
+            )}
+          </React.Fragment>
         );
       })}
     </div>
@@ -228,7 +286,7 @@ function FitBounds({ positions }: { positions: [number, number][] }) {
   return null;
 }
 
-export function MapViewInner({ items, onSelectItem, routeSegments, totalKm }: Props) {
+export function MapViewInner({ items, onSelectItem, routeSegments, totalKm, legDistances, legDurations }: Props) {
   const [userPos, setUserPos] = useState<[number, number] | null>(null);
 
   const pinned = items.filter(
@@ -299,7 +357,7 @@ export function MapViewInner({ items, onSelectItem, routeSegments, totalKm }: Pr
         />
         <FitBounds positions={positions} />
         <LocateControl onLocate={setUserPos} />
-        <ItemChips pinned={pinned} positions={positions} />
+        <ItemChips pinned={pinned} positions={positions} legDistances={legDistances} legDurations={legDurations} />
 
         {/* User location dot */}
         {userPos && (
