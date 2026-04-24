@@ -47,6 +47,7 @@ type Props = {
   tripId: string;
   userId: string;
   legDistances?: Record<string, number> | undefined;
+  legDurations?: Record<string, number> | undefined;
   legModes?: Record<string, RouteMode> | undefined;
   onLegModeChange?: ((itemId: string, mode: RouteMode) => void) | undefined;
 };
@@ -107,6 +108,15 @@ function formatDayHeader(dateStr: string, dayIndex: number) {
 
 function formatLegDist(km: number) {
   return km < 1 ? `${Math.round(km * 1000)} m` : `${km.toFixed(1)} km`;
+}
+
+function formatLegDuration(secs: number): string {
+  const mins = Math.round(secs / 60);
+  if (mins < 1) return "<1 min";
+  if (mins < 60) return `${mins} min`;
+  const h = Math.floor(mins / 60);
+  const m = mins % 60;
+  return m === 0 ? `${h}h` : `${h}h ${m}m`;
 }
 
 // ── Vote tally bar ────────────────────────────────────────────────────────────
@@ -211,9 +221,11 @@ function useSwipeReorder({
 function ItemCard({
   item,
   idx,
+  seqNum,
   total,
   userId,
   legDistances,
+  legDurations,
   legModes,
   onLegModeChange,
   onEdit,
@@ -222,9 +234,11 @@ function ItemCard({
 }: {
   item: ItineraryItem;
   idx: number;
+  seqNum: number;
   total: number;
   userId: string;
   legDistances?: Record<string, number> | undefined;
+  legDurations?: Record<string, number> | undefined;
   legModes?: Record<string, RouteMode> | undefined;
   onLegModeChange?: ((itemId: string, mode: RouteMode) => void) | undefined;
   onEdit: (item: ItineraryItem) => void;
@@ -243,19 +257,37 @@ function ItemCard({
 
   const nodeColor = NODE_COLORS[item.type] ?? "bg-[#A09B96]";
   const legKm = legDistances?.[item.id];
+  const legDuration = legDurations?.[item.id];
   const legMode = legModes?.[item.id] ?? "driving";
   const isDragging = dragDy !== 0;
 
   return (
     <div>
+      {/* Time — outside card, above */}
+      {item.startTime && (
+        <div className="pl-9 mb-1">
+          <span className="text-[11px] font-mono font-semibold text-[#E8622A]">
+            {new Date(item.startTime).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}
+            {item.endTime
+              ? ` – ${new Date(item.endTime).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}`
+              : ""}
+          </span>
+        </div>
+      )}
+
       {/* Row: node + card */}
       <div className="flex gap-3 group">
         {/* Left column: node dot + hover reorder buttons (desktop fallback) */}
         <div className="flex flex-col items-center flex-shrink-0 w-6 gap-0.5">
-          <div
-            className={`w-6 h-6 rounded-full flex items-center justify-center text-[11px] ${nodeColor} z-10 mt-3`}
-          >
-            <span>{ITEM_EMOJI[item.type] ?? "📌"}</span>
+          <div className="relative mt-3">
+            <div
+              className={`w-6 h-6 rounded-full flex items-center justify-center text-[11px] ${nodeColor} z-10`}
+            >
+              <span>{ITEM_EMOJI[item.type] ?? "📌"}</span>
+            </div>
+            <div className="absolute -top-1.5 -right-1.5 w-[14px] h-[14px] rounded-full bg-[#1A1512] text-white text-[8px] font-bold font-mono flex items-center justify-center border border-[#FAF8F5] leading-none z-20">
+              {seqNum}
+            </div>
           </div>
           <button
             type="button"
@@ -287,36 +319,35 @@ function ItemCard({
               : "0 1px 3px rgba(26,21,18,0.04)",
             zIndex: isDragging ? 20 : undefined,
           }}
-          className={`flex-1 min-w-0 bg-white border rounded-[12px] p-3 cursor-pointer relative select-none ${
+          className={`flex-1 min-w-0 bg-white border rounded-[12px] p-3 relative select-none ${
             isDragging
               ? "border-[#E8622A] scale-[1.025]"
-              : "border-[#E5E0DA] active:scale-[0.99]"
+              : "border-[#E5E0DA]"
           }`}
-          onClick={() => onEdit(item)}
         >
           <div className="flex items-start justify-between gap-2">
             <p className="text-[14px] font-semibold text-[#1A1512] break-words min-w-0">{item.title}</p>
-            <div className="flex items-center gap-2 flex-shrink-0">
+            <div className="flex items-center gap-1 flex-shrink-0">
               {/* Drag handle — touch here to reorder */}
               <span
                 ref={handleRef}
                 style={{ touchAction: "none" }}
-                className="text-[#C8C0B8] text-[18px] leading-none select-none cursor-grab active:cursor-grabbing px-1 -mr-1"
+                className="text-[#C8C0B8] text-[18px] leading-none select-none cursor-grab active:cursor-grabbing px-1"
                 onClick={(e) => e.stopPropagation()}
                 aria-label="Drag to reorder"
               >
                 ⠿
               </span>
-              <span className="text-[11px] text-[#A09B96]">Edit ›</span>
+              <button
+                type="button"
+                onClick={(e) => { e.stopPropagation(); onEdit(item); }}
+                className="w-7 h-7 flex items-center justify-center rounded-full text-[#A09B96] hover:bg-[#F0EDE8] hover:text-[#6B6560] transition-colors"
+                aria-label="Edit item"
+              >
+                ···
+              </button>
             </div>
           </div>
-
-          {item.startTime && (
-            <p className="text-xs text-[#6B6560] mt-0.5">
-              {new Date(item.startTime).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}
-              {item.endTime ? ` – ${new Date(item.endTime).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}` : ""}
-            </p>
-          )}
 
           <div className="flex flex-wrap gap-1.5 mt-2">
             {item.locationName && (
@@ -390,6 +421,7 @@ function ItemCard({
           {legMode !== "none" && (
             <span className="text-[11px] font-semibold text-[#A09B96] font-mono flex-shrink-0">
               {ROUTE_MODE_ICON[legMode]} {formatLegDist(legKm)}
+              {legDuration !== undefined && legDuration > 0 ? ` · ${formatLegDuration(legDuration)}` : ""}
             </span>
           )}
           <div className="flex-1 border-t border-dashed border-[#E5E0DA]" />
@@ -404,10 +436,12 @@ function ItemCard({
 function DaySection({
   dateStr,
   dayIndex,
+  seqOffset,
   items,
   userId,
   tripId,
   legDistances,
+  legDurations,
   legModes,
   onLegModeChange,
   onEdit,
@@ -415,10 +449,12 @@ function DaySection({
 }: {
   dateStr: string;
   dayIndex: number;
+  seqOffset: number;
   items: ItineraryItem[];
   userId: string;
   tripId: string;
   legDistances?: Record<string, number> | undefined;
+  legDurations?: Record<string, number> | undefined;
   legModes?: Record<string, RouteMode> | undefined;
   onLegModeChange?: ((itemId: string, mode: RouteMode) => void) | undefined;
   onEdit: (item: ItineraryItem) => void;
@@ -473,9 +509,11 @@ function DaySection({
               key={item.id}
               item={item}
               idx={idx}
+              seqNum={seqOffset + idx + 1}
               total={orderedItems.length}
               userId={userId}
               legDistances={legDistances}
+              legDurations={legDurations}
               legModes={legModes}
               onLegModeChange={onLegModeChange}
               onEdit={onEdit}
@@ -491,7 +529,7 @@ function DaySection({
 
 // ── Main component ────────────────────────────────────────────────────────────
 
-export function ItineraryTimeline({ items, tripId, userId, legDistances, legModes, onLegModeChange }: Props) {
+export function ItineraryTimeline({ items, tripId, userId, legDistances, legDurations, legModes, onLegModeChange }: Props) {
   const utils = api.useUtils();
   const [editItem, setEditItem] = useState<ItineraryItem | null>(null);
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
@@ -569,24 +607,35 @@ export function ItineraryTimeline({ items, tripId, userId, legDistances, legMode
       )}
 
       <div className="space-y-6">
-        {filteredGroups.map(([dateStr, dayItems]) => {
-          const originalIndex = groups.findIndex(([k]) => k === dateStr);
-          return (
-            <DaySection
-              key={dateStr || "no-date"}
-              dateStr={dateStr}
-              dayIndex={originalIndex + 1}
-              items={dayItems}
-              userId={userId}
-              tripId={tripId}
-              legDistances={legDistances}
-              legModes={legModes}
-              onLegModeChange={onLegModeChange}
-              onEdit={setEditItem}
-              onCastVote={(itemId, vote) => castVote.mutate({ itemId, vote })}
-            />
-          );
-        })}
+        {(() => {
+          // Compute cumulative seq offsets from ALL groups (not filtered) for global numbering
+          const groupSeqOffsets = new Map<string, number>();
+          let cumSeq = 0;
+          for (const [dateStr, dayItems] of groups) {
+            groupSeqOffsets.set(dateStr || "__none__", cumSeq);
+            cumSeq += dayItems.length;
+          }
+          return filteredGroups.map(([dateStr, dayItems]) => {
+            const originalIndex = groups.findIndex(([k]) => k === dateStr);
+            return (
+              <DaySection
+                key={dateStr || "no-date"}
+                dateStr={dateStr}
+                dayIndex={originalIndex + 1}
+                seqOffset={groupSeqOffsets.get(dateStr || "__none__") ?? 0}
+                items={dayItems}
+                userId={userId}
+                tripId={tripId}
+                legDistances={legDistances}
+                legDurations={legDurations}
+                legModes={legModes}
+                onLegModeChange={onLegModeChange}
+                onEdit={setEditItem}
+                onCastVote={(itemId, vote) => castVote.mutate({ itemId, vote })}
+              />
+            );
+          });
+        })()}
       </div>
 
       {/* Edit sheet */}

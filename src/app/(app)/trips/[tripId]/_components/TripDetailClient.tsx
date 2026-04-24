@@ -157,6 +157,7 @@ export function TripDetailClient({ tripId, userId }: Props) {
   const [routeData, setRouteData] = useState<RouteData | null>(null);
   const [legModes, setLegModes] = useState<Record<string, RouteMode>>({});
   const [legDistances, setLegDistances] = useState<Record<string, number>>({});
+  const [legDurations, setLegDurations] = useState<Record<string, number>>({});
   const [legCoords, setLegCoords] = useState<Record<string, [number, number][]>>({});
   const utils = api.useUtils();
 
@@ -257,6 +258,7 @@ export function TripDetailClient({ tripId, userId }: Props) {
     if (scheduledPinnedItems.length < 2) {
       setRouteData(null);
       setLegDistances({});
+      setLegDurations({});
       setLegModes({});
       setLegCoords({});
       return;
@@ -269,27 +271,30 @@ export function TripDetailClient({ tripId, userId }: Props) {
         const defaultMode: RouteMode = isDayBoundary ? "none" : "driving";
         const itemMode = (item.routeMode ?? defaultMode) as RouteMode;
         if (itemMode === "none") {
-          return { id: item.id, mode: itemMode, distance: 0, coords: [] as [number, number][] };
+          return { id: item.id, mode: itemMode, distance: 0, duration: 0, coords: [] as [number, number][] };
         }
         const coordStr = `${item.locationLng},${item.locationLat};${to.locationLng},${to.locationLat}`;
         const profile = MAPBOX_PROFILE[itemMode];
         const r = await fetch(
           `https://api.mapbox.com/directions/v5/mapbox/${profile}/${coordStr}?geometries=geojson&overview=full&access_token=${MAPBOX_TOKEN}`
         );
-        const data = (await r.json()) as { routes?: { distance: number; geometry: { coordinates: [number, number][] } }[] };
+        const data = (await r.json()) as { routes?: { distance: number; duration: number; geometry: { coordinates: [number, number][] } }[] };
         const route = data.routes?.[0];
-        return { id: item.id, mode: itemMode, distance: route?.distance ?? 0, coords: route?.geometry.coordinates ?? [] as [number, number][] };
+        return { id: item.id, mode: itemMode, distance: route?.distance ?? 0, duration: route?.duration ?? 0, coords: route?.geometry.coordinates ?? [] as [number, number][] };
       })
     ).then((results) => {
       const distances: Record<string, number> = {};
+      const durations: Record<string, number> = {};
       const modes: Record<string, RouteMode> = {};
       const coords: Record<string, [number, number][]> = {};
       results.forEach((r) => {
         distances[r.id] = r.distance / 1000;
+        durations[r.id] = r.duration;
         modes[r.id] = r.mode;
         coords[r.id] = r.coords.map(([lng, lat]) => [lat, lng] as [number, number]);
       });
       setLegDistances(distances);
+      setLegDurations(durations);
       setLegModes(modes);
       setLegCoords(coords);
       setRouteData({
@@ -299,6 +304,7 @@ export function TripDetailClient({ tripId, userId }: Props) {
     }).catch(() => {
       setRouteData(null);
       setLegDistances({});
+      setLegDurations({});
       setLegModes({});
       setLegCoords({});
     });
@@ -312,6 +318,7 @@ export function TripDetailClient({ tripId, userId }: Props) {
     if (idx === -1 || idx >= scheduledPinnedItems.length - 1) return;
     if (mode === "none") {
       setLegDistances((prev) => ({ ...prev, [itemId]: 0 }));
+      setLegDurations((prev) => ({ ...prev, [itemId]: 0 }));
       setLegCoords((prev) => ({ ...prev, [itemId]: [] }));
       return;
     }
@@ -323,10 +330,11 @@ export function TripDetailClient({ tripId, userId }: Props) {
       const r = await fetch(
         `https://api.mapbox.com/directions/v5/mapbox/${profile}/${coordStr}?geometries=geojson&overview=full&access_token=${MAPBOX_TOKEN}`
       );
-      const data = (await r.json()) as { routes?: { distance: number; geometry: { coordinates: [number, number][] } }[] };
+      const data = (await r.json()) as { routes?: { distance: number; duration: number; geometry: { coordinates: [number, number][] } }[] };
       const route = data.routes?.[0];
       if (route) {
         setLegDistances((prev) => ({ ...prev, [itemId]: route.distance / 1000 }));
+        setLegDurations((prev) => ({ ...prev, [itemId]: route.duration }));
         setLegCoords((prev) => ({
           ...prev,
           [itemId]: route.geometry.coordinates.map(([lng, lat]) => [lat, lng] as [number, number]),
@@ -587,6 +595,7 @@ export function TripDetailClient({ tripId, userId }: Props) {
             tripId={trip.id}
             userId={userId}
             legDistances={legDistances}
+            legDurations={legDurations}
             legModes={legModes}
             onLegModeChange={handleLegModeChange}
           />
