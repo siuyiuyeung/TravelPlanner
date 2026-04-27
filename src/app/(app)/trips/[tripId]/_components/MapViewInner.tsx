@@ -467,12 +467,18 @@ export function MapViewInner({ items, onSelectItem, routeSegments, totalKm, legD
           />
         )}
 
-        {/* Route polylines */}
+        {/* Route polylines — casing + fill, Google Maps style */}
         <Source id="routes" type="geojson" data={routeGeoJSON}>
+          <Layer
+            id="route-casing"
+            type="line"
+            paint={{ "line-color": "#ffffff", "line-width": 10, "line-opacity": 0.9 }}
+            layout={{ "line-cap": "round", "line-join": "round" }}
+          />
           <Layer
             id="route-line"
             type="line"
-            paint={{ "line-color": "#E8622A", "line-width": 2.5, "line-opacity": 0.6 }}
+            paint={{ "line-color": "#1A73E8", "line-width": 6, "line-opacity": 1 }}
             layout={{ "line-cap": "round", "line-join": "round" }}
           />
         </Source>
