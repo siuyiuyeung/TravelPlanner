@@ -260,6 +260,7 @@ function ItemCard({
   const legDuration = legDurations?.[item.id];
   const legMode = legModes?.[item.id] ?? "driving";
   const isDragging = dragDy !== 0;
+  const [modeExpanded, setModeExpanded] = useState(false);
 
   return (
     <div>
@@ -400,21 +401,35 @@ function ItemCard({
           <div className="flex-1 border-t border-dashed border-[#E5E0DA]" />
           {/* Mode picker */}
           <div className="flex items-center gap-0.5 bg-[#F0EDE8] rounded-full px-1.5 py-0.5">
-            {MODES.map((m) => (
+            {modeExpanded ? (
+              MODES.map((m) => (
+                <button
+                  key={m.value}
+                  type="button"
+                  onClick={() => {
+                    onLegModeChange?.(item.id, m.value);
+                    setModeExpanded(false);
+                  }}
+                  className={`w-6 h-6 flex items-center justify-center rounded-full text-[12px] transition-colors ${
+                    legMode === m.value
+                      ? "bg-[#E8622A] shadow-sm"
+                      : "hover:bg-[#E5E0DA]"
+                  }`}
+                  aria-label={m.value}
+                >
+                  {m.icon}
+                </button>
+              ))
+            ) : (
               <button
-                key={m.value}
                 type="button"
-                onClick={() => onLegModeChange?.(item.id, m.value)}
-                className={`w-6 h-6 flex items-center justify-center rounded-full text-[12px] transition-colors ${
-                  legMode === m.value
-                    ? "bg-[#E8622A] shadow-sm"
-                    : "hover:bg-[#E5E0DA]"
-                }`}
-                aria-label={m.value}
+                onClick={() => setModeExpanded(true)}
+                className="w-6 h-6 flex items-center justify-center rounded-full text-[12px] bg-[#E8622A] shadow-sm"
+                aria-label={legMode}
               >
-                {m.icon}
+                {ROUTE_MODE_ICON[legMode]}
               </button>
-            ))}
+            )}
           </div>
           {legMode !== "none" && (
             <span className="text-[11px] font-semibold text-[#A09B96] font-mono flex-shrink-0">
