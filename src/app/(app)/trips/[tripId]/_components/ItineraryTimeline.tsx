@@ -325,28 +325,26 @@ function ItemCard({
               : "border-[#E5E0DA]"
           }`}
         >
-          <div className="flex items-start justify-between gap-2">
-            <p className="text-[14px] font-semibold text-[#1A1512] break-words min-w-0">{item.title}</p>
-            <div className="flex items-center gap-1 flex-shrink-0">
-              {/* Drag handle — touch here to reorder */}
-              <span
-                ref={handleRef}
-                style={{ touchAction: "none" }}
-                className="text-[#C8C0B8] text-[18px] leading-none select-none cursor-grab active:cursor-grabbing px-1"
-                onClick={(e) => e.stopPropagation()}
-                aria-label="Drag to reorder"
-              >
-                ⠿
-              </span>
-              <button
-                type="button"
-                onClick={(e) => { e.stopPropagation(); onEdit(item); }}
-                className="w-7 h-7 flex items-center justify-center rounded-full text-[#A09B96] hover:bg-[#F0EDE8] hover:text-[#6B6560] transition-colors"
-                aria-label="Edit item"
-              >
-                ···
-              </button>
-            </div>
+          <div className="flex items-start gap-2">
+            {/* Drag handle — touch here to reorder */}
+            <span
+              ref={handleRef}
+              style={{ touchAction: "none" }}
+              className="text-[#C8C0B8] text-[18px] leading-none select-none cursor-grab active:cursor-grabbing flex-shrink-0 mt-0.5"
+              onClick={(e) => e.stopPropagation()}
+              aria-label="Drag to reorder"
+            >
+              ⠿
+            </span>
+            <p className="text-[14px] font-semibold text-[#1A1512] break-words min-w-0 flex-1">{item.title}</p>
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); onEdit(item); }}
+              className="w-7 h-7 flex items-center justify-center rounded-full text-[#A09B96] hover:bg-[#F0EDE8] hover:text-[#6B6560] transition-colors flex-shrink-0"
+              aria-label="Edit item"
+            >
+              ···
+            </button>
           </div>
 
           <div className="flex flex-wrap gap-1.5 mt-2">
