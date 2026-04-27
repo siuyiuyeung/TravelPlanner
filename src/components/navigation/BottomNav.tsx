@@ -54,7 +54,7 @@ export function BottomNav() {
 
   return (
     <nav
-      className="fixed bottom-0 left-0 right-0 h-[82px] flex items-start pt-2.5
+      className="fixed bottom-0 left-0 right-0 flex items-start pt-2.5
                  bg-[rgba(250,248,245,0.93)] backdrop-blur-md
                  border-t border-[#E5E0DA] z-50 pb-safe"
     >
