@@ -2,6 +2,7 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   output: "standalone",
+  transpilePackages: ["mapbox-gl"],
   ...(process.env.NEXT_DEV_INDICATORS !== "true" && { devIndicators: false }),
   ...(process.env.ALLOWED_ORIGINS && {
     allowedDevOrigins: process.env.ALLOWED_ORIGINS.split(",").map((s) => s.trim()),

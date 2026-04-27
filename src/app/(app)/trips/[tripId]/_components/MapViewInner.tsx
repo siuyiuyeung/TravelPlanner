@@ -1,9 +1,16 @@
 "use client";
 
 import React, { useEffect, useRef, useState } from "react";
-import { MapContainer, TileLayer, Marker, Popup, Polyline, CircleMarker, useMap } from "react-leaflet";
-import L from "leaflet";
-import "leaflet/dist/leaflet.css";
+import Map, {
+  Layer,
+  Marker,
+  Popup,
+  Source,
+  useMap,
+  type MapRef,
+} from "react-map-gl/mapbox";
+import type { GeoJSON } from "geojson";
+import "mapbox-gl/dist/mapbox-gl.css";
 
 type MapItem = {
   id: string;
@@ -24,6 +31,30 @@ type Props = {
   legDurations?: Record<string, number> | undefined;
 };
 
+const MAPBOX_TOKEN = process.env.NEXT_PUBLIC_MAPBOX_TOKEN ?? "";
+
+const STYLES = {
+  streets: "mapbox://styles/mapbox/streets-v12",
+  outdoors: "mapbox://styles/mapbox/outdoors-v12",
+  satellite: "mapbox://styles/mapbox/satellite-streets-v12",
+} as const;
+type StyleKey = keyof typeof STYLES;
+
+const STYLE_LABELS: Record<StyleKey, string> = {
+  streets: "Streets",
+  outdoors: "Outdoors",
+  satellite: "Satellite",
+};
+
+const ITEM_EMOJI: Record<string, string> = {
+  flight: "✈️",
+  hotel: "🏨",
+  restaurant: "🍜",
+  activity: "🎡",
+  transport: "🚗",
+  note: "📝",
+};
+
 function fmtDist(km: number) {
   return km < 1 ? `${Math.round(km * 1000)}m` : `${km.toFixed(1)}km`;
 }
@@ -37,128 +68,121 @@ function fmtDur(secs: number) {
   return m === 0 ? `${h}h` : `${h}h${m}m`;
 }
 
-const ITEM_EMOJI: Record<string, string> = {
-  flight: "✈️",
-  hotel: "🏨",
-  restaurant: "🍜",
-  activity: "🎡",
-  transport: "🚗",
-  note: "📝",
-};
-
-function makeIcon(emoji: string, seq: number) {
-  return L.divIcon({
-    html: `<div style="position:relative;width:36px;height:36px;">
-      <div style="
-        width:36px;height:36px;
-        background:#E8622A;
-        border-radius:50% 50% 50% 0;
-        transform:rotate(-45deg);
-        display:flex;align-items:center;justify-content:center;
-        box-shadow:0 2px 6px rgba(0,0,0,0.3);
-        border:2px solid white;
-      ">
-        <span style="transform:rotate(45deg);font-size:16px;line-height:1">${emoji}</span>
+function MarkerPin({ emoji, seq }: { emoji: string; seq: number }) {
+  return (
+    <div style={{ position: "relative", width: 36, height: 36 }}>
+      <div
+        style={{
+          width: 36,
+          height: 36,
+          background: "#E8622A",
+          borderRadius: "50% 50% 50% 0",
+          transform: "rotate(-45deg)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          boxShadow: "0 2px 6px rgba(0,0,0,0.3)",
+          border: "2px solid white",
+        }}
+      >
+        <span style={{ transform: "rotate(45deg)", fontSize: 16, lineHeight: 1 }}>
+          {emoji}
+        </span>
       </div>
-      <div style="
-        position:absolute;top:-8px;right:-8px;
-        width:18px;height:18px;border-radius:50%;
-        background:#1A1512;color:#fff;
-        font-size:10px;font-weight:700;font-family:monospace;
-        display:flex;align-items:center;justify-content:center;
-        border:1.5px solid #fff;box-shadow:0 1px 3px rgba(0,0,0,0.4);
-      ">${seq}</div>
-    </div>`,
-    className: "",
-    iconSize: [36, 36],
-    iconAnchor: [18, 36],
-    popupAnchor: [0, -42],
-  });
+      <div
+        style={{
+          position: "absolute",
+          top: -8,
+          right: -8,
+          width: 18,
+          height: 18,
+          borderRadius: "50%",
+          background: "#1A1512",
+          color: "#fff",
+          fontSize: 10,
+          fontWeight: 700,
+          fontFamily: "monospace",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          border: "1.5px solid #fff",
+          boxShadow: "0 1px 3px rgba(0,0,0,0.4)",
+        }}
+      >
+        {seq}
+      </div>
+    </div>
+  );
 }
 
 type LocateStatus = "idle" | "loading" | "error";
 
-function LocateControl({
-  onLocate,
-}: {
-  onLocate: (pos: [number, number]) => void;
-}) {
-  const map = useMap();
+function LocateControl({ onLocate }: { onLocate: (lng: number, lat: number) => void }) {
+  const { current: mapRef } = useMap();
   const [status, setStatus] = useState<LocateStatus>("idle");
 
   function handleLocate() {
-    if (!navigator.geolocation) {
-      setStatus("error");
-      return;
-    }
+    if (!navigator.geolocation) { setStatus("error"); return; }
     setStatus("loading");
     navigator.geolocation.getCurrentPosition(
       (pos) => {
-        const coords: [number, number] = [pos.coords.latitude, pos.coords.longitude];
-        map.setView(coords, 16, { animate: true });
-        onLocate(coords);
+        const lng = pos.coords.longitude;
+        const lat = pos.coords.latitude;
+        mapRef?.flyTo({ center: [lng, lat], zoom: 16, animate: true });
+        onLocate(lng, lat);
         setStatus("idle");
       },
       () => {
         setStatus("error");
         setTimeout(() => setStatus("idle"), 2000);
       },
-      { enableHighAccuracy: true, timeout: 10000 }
+      { enableHighAccuracy: true, timeout: 10000 },
     );
   }
 
   return (
-    <div
-      style={{
-        position: "absolute",
-        bottom: 24,
-        right: 12,
-        zIndex: 1000,
-      }}
-    >
+    <div style={{ position: "absolute", bottom: 24, right: 12, zIndex: 2 }}>
       <button
         onClick={handleLocate}
         title="Go to my location"
         style={{
-          width: 40,
-          height: 40,
-          borderRadius: "50%",
-          background: "#fff",
-          border: "none",
-          boxShadow: "0 2px 8px rgba(0,0,0,0.25)",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          cursor: "pointer",
-          transition: "box-shadow 0.15s",
+          width: 40, height: 40, borderRadius: "50%", background: "#fff", border: "none",
+          boxShadow: "0 2px 8px rgba(0,0,0,0.25)", display: "flex", alignItems: "center",
+          justifyContent: "center", cursor: "pointer",
         }}
       >
         {status === "loading" ? (
-          <div
-            style={{
-              width: 18,
-              height: 18,
-              border: "2.5px solid #2D6A8F",
-              borderTopColor: "transparent",
-              borderRadius: "50%",
-              animation: "spin 0.7s linear infinite",
-            }}
-          />
+          <div style={{ width: 18, height: 18, border: "2.5px solid #2D6A8F", borderTopColor: "transparent", borderRadius: "50%", animation: "spin 0.7s linear infinite" }} />
         ) : status === "error" ? (
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#E8622A" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-            <circle cx="12" cy="12" r="10" />
-            <line x1="12" y1="8" x2="12" y2="12" />
-            <line x1="12" y1="16" x2="12.01" y2="16" />
+            <circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" />
           </svg>
         ) : (
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#2D6A8F" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-            <circle cx="12" cy="12" r="3" />
-            <path d="M12 2v3M12 19v3M2 12h3M19 12h3" />
-            <circle cx="12" cy="12" r="8" />
+            <circle cx="12" cy="12" r="3" /><path d="M12 2v3M12 19v3M2 12h3M19 12h3" /><circle cx="12" cy="12" r="8" />
           </svg>
         )}
       </button>
       <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+    </div>
+  );
+}
+
+function CompassReset() {
+  const { current: mapRef } = useMap();
+  return (
+    <div style={{ position: "absolute", bottom: 24, right: 60, zIndex: 2 }}>
+      <button
+        onClick={() => mapRef?.easeTo({ pitch: 0, bearing: 0, duration: 500 })}
+        title="Reset pitch and rotation"
+        style={{
+          width: 40, height: 40, borderRadius: "50%", background: "#fff", border: "none",
+          boxShadow: "0 2px 8px rgba(0,0,0,0.25)", display: "flex", alignItems: "center",
+          justifyContent: "center", cursor: "pointer", fontSize: 18,
+        }}
+      >
+        🧭
+      </button>
     </div>
   );
 }
@@ -170,17 +194,25 @@ function ItemChips({
   legDurations,
 }: {
   pinned: MapItem[];
-  positions: [number, number][];
+  positions: { lng: number; lat: number }[];
   legDistances?: Record<string, number> | undefined;
   legDurations?: Record<string, number> | undefined;
 }) {
-  const map = useMap();
+  const { current: mapRef } = useMap();
   const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (!containerRef.current) return;
-    L.DomEvent.disableScrollPropagation(containerRef.current);
-    L.DomEvent.disableClickPropagation(containerRef.current);
+    const el = containerRef.current;
+    if (!el) return;
+    const stop = (e: Event) => e.stopPropagation();
+    el.addEventListener("wheel", stop, { passive: false });
+    el.addEventListener("touchstart", stop, { passive: false });
+    el.addEventListener("touchmove", stop, { passive: false });
+    return () => {
+      el.removeEventListener("wheel", stop);
+      el.removeEventListener("touchstart", stop);
+      el.removeEventListener("touchmove", stop);
+    };
   }, []);
 
   if (pinned.length === 0) return null;
@@ -189,19 +221,10 @@ function ItemChips({
     <div
       ref={containerRef}
       style={{
-        position: "absolute",
-        bottom: 72,
-        left: 0,
-        right: 0,
-        zIndex: 1000,
-        pointerEvents: "auto",
-        display: "flex",
-        alignItems: "center",
-        overflowX: "auto",
-        WebkitOverflowScrolling: "touch",
-        padding: "0 12px",
-        gap: 0,
-        scrollbarWidth: "none",
+        position: "absolute", bottom: 72, left: 0, right: 0, zIndex: 2,
+        pointerEvents: "auto", display: "flex", alignItems: "center",
+        overflowX: "auto", WebkitOverflowScrolling: "touch",
+        padding: "0 12px", gap: 0, scrollbarWidth: "none",
       } as React.CSSProperties}
     >
       {pinned.map((item, idx) => {
@@ -216,44 +239,23 @@ function ItemChips({
             <button
               style={{ flexShrink: 0 }}
               onClick={(e) => {
-                map.flyTo(pos, 16, { animate: true });
+                mapRef?.flyTo({ center: [pos.lng, pos.lat], zoom: 16, animate: true });
                 e.currentTarget.scrollIntoView({ behavior: "smooth", inline: "center", block: "nearest" });
               }}
               className="w-[112px] flex items-center gap-1.5 px-2.5 py-1.5 rounded-full bg-white/90 backdrop-blur-sm shadow-sm text-[#1A1512] border border-white/60 overflow-hidden"
             >
-              <span className="text-[10px] font-mono font-bold text-[#A09B96] leading-none flex-shrink-0">
-                {idx + 1}
-              </span>
+              <span className="text-[10px] font-mono font-bold text-[#A09B96] leading-none flex-shrink-0">{idx + 1}</span>
               <span className="text-[13px] leading-none flex-shrink-0">{emoji}</span>
-              <span className="text-[12px] font-semibold truncate min-w-0 flex-1">
-                {item.title}
-              </span>
+              <span className="text-[12px] font-semibold truncate min-w-0 flex-1">{item.title}</span>
             </button>
             {!isLast && (
               <div style={{ flexShrink: 0, display: "flex", alignItems: "center", gap: 3, padding: "0 4px" }}>
                 <div style={{ width: 6, height: 1, background: "#C8C0B8" }} />
                 {hasLeg ? (
-                  <div
-                    style={{
-                      background: "rgba(255,255,255,0.88)",
-                      backdropFilter: "blur(4px)",
-                      border: "1px solid rgba(229,224,218,0.8)",
-                      borderRadius: 999,
-                      padding: "3px 6px",
-                      display: "flex",
-                      flexDirection: "column",
-                      alignItems: "center",
-                      gap: 1,
-                      flexShrink: 0,
-                    }}
-                  >
-                    <span style={{ fontSize: 9, fontFamily: "monospace", fontWeight: 700, color: "#6B6560", lineHeight: 1, whiteSpace: "nowrap" }}>
-                      {fmtDist(legKm!)}
-                    </span>
+                  <div style={{ background: "rgba(255,255,255,0.88)", backdropFilter: "blur(4px)", border: "1px solid rgba(229,224,218,0.8)", borderRadius: 999, padding: "3px 6px", display: "flex", flexDirection: "column", alignItems: "center", gap: 1, flexShrink: 0 }}>
+                    <span style={{ fontSize: 9, fontFamily: "monospace", fontWeight: 700, color: "#6B6560", lineHeight: 1, whiteSpace: "nowrap" }}>{fmtDist(legKm!)}</span>
                     {legSecs !== undefined && legSecs > 0 && (
-                      <span style={{ fontSize: 9, fontFamily: "monospace", fontWeight: 600, color: "#A09B96", lineHeight: 1, whiteSpace: "nowrap" }}>
-                        {fmtDur(legSecs)}
-                      </span>
+                      <span style={{ fontSize: 9, fontFamily: "monospace", fontWeight: 600, color: "#A09B96", lineHeight: 1, whiteSpace: "nowrap" }}>{fmtDur(legSecs)}</span>
                     )}
                   </div>
                 ) : (
@@ -269,71 +271,149 @@ function ItemChips({
   );
 }
 
-function FitBounds({ positions }: { positions: [number, number][] }) {
-  const map = useMap();
-  const fitted = useRef(false);
-
+function TerrainSetter() {
+  const { current: mapRef } = useMap();
   useEffect(() => {
-    if (positions.length === 0 || fitted.current) return;
-    fitted.current = true;
-    if (positions.length === 1) {
-      map.setView(positions[0]!, 14);
-    } else {
-      map.fitBounds(positions, { padding: [40, 40] });
+    if (!mapRef) return;
+    const map = mapRef.getMap();
+    function applyTerrain() {
+      map.setTerrain({ source: "mapbox-dem", exaggeration: 1.5 });
     }
-  }, [map, positions]);
-
+    map.on("style.load", applyTerrain);
+    if (map.isStyleLoaded()) applyTerrain();
+    return () => { map.off("style.load", applyTerrain); };
+  }, [mapRef]);
   return null;
 }
 
 export function MapViewInner({ items, onSelectItem, routeSegments, totalKm, legDistances, legDurations }: Props) {
-  const [userPos, setUserPos] = useState<[number, number] | null>(null);
+  const mapRef = useRef<MapRef>(null);
+  const fitted = useRef(false);
+  const [styleKey, setStyleKey] = useState<StyleKey>("streets");
+  const [styleOpen, setStyleOpen] = useState(false);
+  const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
+  const [userPos, setUserPos] = useState<{ lng: number; lat: number } | null>(null);
 
-  const pinned = items.filter(
-    (i) => i.locationLat !== null && i.locationLng !== null
-  );
+  const pinned = items.filter((i) => i.locationLat !== null && i.locationLng !== null);
+  const positions = pinned.map((i) => ({
+    lng: parseFloat(i.locationLng!),
+    lat: parseFloat(i.locationLat!),
+  }));
 
-  const positions: [number, number][] = pinned.map((i) => [
-    parseFloat(i.locationLat!),
-    parseFloat(i.locationLng!),
-  ]);
+  const defaultCenter = positions[0] ?? { lng: 114.1694, lat: 22.3193 };
+  const selectedIdx = pinned.findIndex((i) => i.id === selectedItemId);
+  const selectedItem = selectedIdx >= 0 ? pinned[selectedIdx] : null;
+  const selectedPos = selectedIdx >= 0 ? positions[selectedIdx] : null;
 
-  const defaultCenter: [number, number] = positions[0] ?? [22.3193, 114.1694];
+  const isSatellite = styleKey === "satellite";
+
+  const routeGeoJSON: GeoJSON.FeatureCollection = {
+    type: "FeatureCollection",
+    features: routeSegments
+      .filter((seg) => seg.length > 1)
+      .map((seg) => ({
+        type: "Feature",
+        geometry: {
+          type: "LineString",
+          // incoming segments are [lat, lng] — flip to [lng, lat] for GL
+          coordinates: seg.map(([lat, lng]) => [lng, lat]),
+        },
+        properties: {},
+      })),
+  };
+
+  const userPosGeoJSON: GeoJSON.FeatureCollection | null = userPos
+    ? {
+        type: "FeatureCollection",
+        features: [{
+          type: "Feature",
+          geometry: { type: "Point", coordinates: [userPos.lng, userPos.lat] },
+          properties: {},
+        }],
+      }
+    : null;
+
+  function handleLoad() {
+    if (positions.length === 0 || fitted.current) return;
+    fitted.current = true;
+    if (positions.length === 1) {
+      mapRef.current?.flyTo({ center: [positions[0]!.lng, positions[0]!.lat], zoom: 14 });
+    } else {
+      const lngs = positions.map((p) => p.lng);
+      const lats = positions.map((p) => p.lat);
+      mapRef.current?.fitBounds(
+        [[Math.min(...lngs), Math.min(...lats)], [Math.max(...lngs), Math.max(...lats)]],
+        { padding: 60 },
+      );
+    }
+  }
 
   return (
     <div style={{ position: "relative", width: "100%", height: "100%" }}>
+      {/* Empty state */}
       {pinned.length === 0 && (
-        <div
-          style={{
-            position: "absolute",
-            inset: 0,
-            zIndex: 1000,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            pointerEvents: "none",
-          }}
-        >
+        <div style={{ position: "absolute", inset: 0, zIndex: 10, display: "flex", alignItems: "center", justifyContent: "center", pointerEvents: "none" }}>
           <div className="bg-white/90 rounded-2xl px-6 py-5 shadow text-center mx-6">
             <span className="text-4xl block mb-2">🗺️</span>
             <p className="font-semibold text-[#1A1512]">No locations yet</p>
-            <p className="text-sm text-[#6B6560] mt-1">
-              Add a location to itinerary items to see them here
-            </p>
+            <p className="text-sm text-[#6B6560] mt-1">Add a location to itinerary items to see them here</p>
           </div>
         </div>
       )}
 
-      {totalKm !== undefined && totalKm > 0 && (
-        <div
+      {/* Style switcher — compact layers button */}
+      <div
+        tabIndex={-1}
+        onBlur={(e) => {
+          if (!e.currentTarget.contains(e.relatedTarget as Node)) {
+            setStyleOpen(false);
+          }
+        }}
+        style={{ position: "absolute", top: 12, right: 12, zIndex: 3, outline: "none" }}
+      >
+        <button
+          onClick={() => setStyleOpen((o) => !o)}
+          title="Map style"
           style={{
-            position: "absolute",
-            bottom: 24,
-            left: 12,
-            zIndex: 1000,
-            pointerEvents: "none",
+            width: 40, height: 40, borderRadius: "50%", background: "#fff", border: "none",
+            boxShadow: "0 2px 8px rgba(0,0,0,0.25)", display: "flex", alignItems: "center",
+            justifyContent: "center", cursor: "pointer",
+            color: styleOpen ? "#E8622A" : "#1A1512",
           }}
         >
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <polygon points="12 2 22 8.5 12 15 2 8.5" />
+            <polyline points="2 15.5 12 22 22 15.5" />
+            <polyline points="2 11.5 12 18 22 11.5" />
+          </svg>
+        </button>
+        {styleOpen && (
+          <div style={{ position: "absolute", top: 48, right: 0, display: "flex", flexDirection: "column", gap: 4, minWidth: 100 }}>
+            {(["streets", "outdoors", "satellite"] as StyleKey[]).map((key) => (
+              <button
+                key={key}
+                onClick={() => { setStyleKey(key); setStyleOpen(false); }}
+                style={{
+                  padding: "6px 14px", borderRadius: 999, fontSize: 12, fontWeight: 600, cursor: "pointer",
+                  background: styleKey === key ? "#1A1512" : "rgba(255,255,255,0.95)",
+                  color: styleKey === key ? "#fff" : "#1A1512",
+                  border: "1.5px solid rgba(255,255,255,0.6)",
+                  boxShadow: "0 2px 8px rgba(0,0,0,0.18)",
+                  backdropFilter: "blur(6px)",
+                  textAlign: "left",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                {STYLE_LABELS[key]}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Total km badge */}
+      {totalKm !== undefined && totalKm > 0 && (
+        <div style={{ position: "absolute", bottom: 24, left: 12, zIndex: 2, pointerEvents: "none" }}>
           <div className="bg-white/95 backdrop-blur-sm rounded-full px-3 py-1.5 shadow-md flex items-center gap-1.5 border border-[#E5E0DA]">
             <span className="text-[12px]">🚗</span>
             <span className="text-[12px] font-semibold text-[#1A1512] font-mono">
@@ -343,96 +423,138 @@ export function MapViewInner({ items, onSelectItem, routeSegments, totalKm, legD
         </div>
       )}
 
-      <MapContainer
-        center={defaultCenter}
-        zoom={13}
+      <Map
+        ref={mapRef}
+        mapboxAccessToken={MAPBOX_TOKEN}
+        mapStyle={STYLES[styleKey]}
+        initialViewState={{
+          longitude: defaultCenter.lng,
+          latitude: defaultCenter.lat,
+          zoom: 13,
+          pitch: 45,
+          bearing: 0,
+        }}
+        dragRotate={true}
         style={{ width: "100%", height: "100%" }}
-        zoomControl={false}
+        onLoad={handleLoad}
       >
-        <TileLayer
-          attribution='&copy; <a href="https://www.mapbox.com/about/maps/">Mapbox</a> &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-          url={`https://api.mapbox.com/styles/v1/mapbox/streets-v12/tiles/{z}/{x}/{y}?access_token=${process.env.NEXT_PUBLIC_MAPBOX_TOKEN}`}
+        <TerrainSetter />
+
+        {/* Terrain DEM source */}
+        <Source
+          id="mapbox-dem"
+          type="raster-dem"
+          url="mapbox://mapbox.mapbox-terrain-dem-v1"
           tileSize={512}
-          zoomOffset={-1}
+          maxzoom={14}
         />
-        <FitBounds positions={positions} />
-        <LocateControl onLocate={setUserPos} />
-        <ItemChips pinned={pinned} positions={positions} legDistances={legDistances} legDurations={legDurations} />
 
-        {/* User location dot */}
-        {userPos && (
-          <>
-            <CircleMarker
-              center={userPos}
-              radius={10}
-              pathOptions={{ color: "#fff", weight: 2, fillColor: "#4285F4", fillOpacity: 0.25 }}
-            />
-            <CircleMarker
-              center={userPos}
-              radius={6}
-              pathOptions={{ color: "#fff", weight: 2, fillColor: "#4285F4", fillOpacity: 1 }}
-            />
-          </>
+        {/* 3D buildings — skip on satellite (imagery already shows buildings) */}
+        {!isSatellite && (
+          <Layer
+            id="3d-buildings"
+            source="composite"
+            source-layer="building"
+            filter={["==", "extrude", "true"]}
+            type="fill-extrusion"
+            minzoom={15}
+            paint={{
+              "fill-extrusion-color": "#aaa",
+              "fill-extrusion-height": ["get", "height"],
+              "fill-extrusion-base": ["get", "min_height"],
+              "fill-extrusion-opacity": 0.6,
+            }}
+          />
         )}
 
-        {routeSegments.map((seg, i) =>
-          seg.length > 1 && (
-            <Polyline
-              key={i}
-              positions={seg}
-              pathOptions={{ color: "#E8622A", weight: 2.5, opacity: 0.6 }}
+        {/* Route polylines */}
+        <Source id="routes" type="geojson" data={routeGeoJSON}>
+          <Layer
+            id="route-line"
+            type="line"
+            paint={{ "line-color": "#E8622A", "line-width": 2.5, "line-opacity": 0.6 }}
+            layout={{ "line-cap": "round", "line-join": "round" }}
+          />
+        </Source>
+
+        {/* User location */}
+        {userPosGeoJSON && (
+          <Source id="user-loc" type="geojson" data={userPosGeoJSON}>
+            <Layer
+              id="user-outer"
+              type="circle"
+              paint={{ "circle-radius": 10, "circle-color": "#4285F4", "circle-opacity": 0.25, "circle-stroke-width": 2, "circle-stroke-color": "#fff" }}
             />
-          )
+            <Layer
+              id="user-inner"
+              type="circle"
+              paint={{ "circle-radius": 6, "circle-color": "#4285F4", "circle-stroke-width": 2, "circle-stroke-color": "#fff" }}
+            />
+          </Source>
         )}
 
+        {/* Item markers */}
         {pinned.map((item, idx) => {
           const pos = positions[idx]!;
           const emoji = ITEM_EMOJI[item.type] ?? "📌";
           return (
-            <Marker key={item.id} position={pos} icon={makeIcon(emoji, idx + 1)}>
-              <Popup>
-                <div style={{ minWidth: 160 }}>
-                  <div
-                    className="cursor-pointer"
-                    onClick={(e) => { e.stopPropagation(); setTimeout(() => onSelectItem(item.id), 50); }}
-                  >
-                    <p style={{ fontWeight: 700, fontSize: 14, marginBottom: 2 }}>
-                      {emoji} {item.title}
-                    </p>
-                    {item.locationName && (
-                      <p style={{ fontSize: 12, color: "#6B6560", marginBottom: 4 }}>
-                        {item.locationName}
-                      </p>
-                    )}
-                    {item.startTime && (
-                      <p style={{ fontSize: 12, color: "#A09B96" }}>
-                        {new Date(item.startTime).toLocaleString("en-US", {
-                          month: "short",
-                          day: "numeric",
-                          hour: "numeric",
-                          minute: "2-digit",
-                        })}
-                      </p>
-                    )}
-                    <p style={{ fontSize: 12, color: "#E8622A", fontWeight: 600, marginTop: 6 }}>
-                      View details →
-                    </p>
-                  </div>
-                  <a
-                    href={`https://maps.google.com?q=${item.locationLat},${item.locationLng}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    onClick={(e) => e.stopPropagation()}
-                    style={{ display: "block", marginTop: 6, textAlign: "center", fontSize: 12, color: "#2D6A8F", textDecoration: "underline" }}
-                  >
-                    Open in Maps ↗
-                  </a>
-                </div>
-              </Popup>
+            <Marker
+              key={item.id}
+              longitude={pos.lng}
+              latitude={pos.lat}
+              anchor="bottom"
+              onClick={() => setSelectedItemId(item.id)}
+            >
+              <MarkerPin emoji={emoji} seq={idx + 1} />
             </Marker>
           );
         })}
-      </MapContainer>
+
+        {/* Popup */}
+        {selectedItem && selectedPos && (
+          <Popup
+            longitude={selectedPos.lng}
+            latitude={selectedPos.lat}
+            anchor="bottom"
+            offset={42}
+            onClose={() => setSelectedItemId(null)}
+            closeButton={false}
+            maxWidth="200px"
+          >
+            <div style={{ minWidth: 160, padding: 4 }}>
+              <div
+                className="cursor-pointer"
+                onClick={() => { setSelectedItemId(null); setTimeout(() => onSelectItem(selectedItem.id), 50); }}
+              >
+                <p style={{ fontWeight: 700, fontSize: 14, marginBottom: 2 }}>
+                  {ITEM_EMOJI[selectedItem.type] ?? "📌"} {selectedItem.title}
+                </p>
+                {selectedItem.locationName && (
+                  <p style={{ fontSize: 12, color: "#6B6560", marginBottom: 4 }}>{selectedItem.locationName}</p>
+                )}
+                {selectedItem.startTime && (
+                  <p style={{ fontSize: 12, color: "#A09B96" }}>
+                    {new Date(selectedItem.startTime).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}
+                  </p>
+                )}
+                <p style={{ fontSize: 12, color: "#E8622A", fontWeight: 600, marginTop: 6 }}>View details →</p>
+              </div>
+              <a
+                href={`https://maps.google.com?q=${selectedItem.locationLat},${selectedItem.locationLng}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{ display: "block", marginTop: 6, textAlign: "center", fontSize: 12, color: "#2D6A8F", textDecoration: "underline" }}
+              >
+                Open in Maps ↗
+              </a>
+            </div>
+          </Popup>
+        )}
+
+        <LocateControl onLocate={(lng, lat) => setUserPos({ lng, lat })} />
+        <CompassReset />
+        <ItemChips pinned={pinned} positions={positions} legDistances={legDistances} legDurations={legDurations} />
+      </Map>
     </div>
   );
 }
