@@ -192,11 +192,13 @@ function ItemChips({
   positions,
   legDistances,
   legDurations,
+  onSelect,
 }: {
   pinned: MapItem[];
   positions: { lng: number; lat: number }[];
   legDistances?: Record<string, number> | undefined;
   legDurations?: Record<string, number> | undefined;
+  onSelect: (id: string) => void;
 }) {
   const { current: mapRef } = useMap();
   const containerRef = useRef<HTMLDivElement>(null);
@@ -208,10 +210,12 @@ function ItemChips({
     el.addEventListener("wheel", stop, { passive: false });
     el.addEventListener("touchstart", stop, { passive: false });
     el.addEventListener("touchmove", stop, { passive: false });
+    el.addEventListener("click", stop);
     return () => {
       el.removeEventListener("wheel", stop);
       el.removeEventListener("touchstart", stop);
       el.removeEventListener("touchmove", stop);
+      el.removeEventListener("click", stop);
     };
   }, []);
 
@@ -241,6 +245,7 @@ function ItemChips({
               onClick={(e) => {
                 mapRef?.flyTo({ center: [pos.lng, pos.lat], zoom: 16, animate: true });
                 e.currentTarget.scrollIntoView({ behavior: "smooth", inline: "center", block: "nearest" });
+                onSelect(item.id);
               }}
               className="w-[112px] flex items-center gap-1.5 px-2.5 py-1.5 rounded-full bg-white/90 backdrop-blur-sm shadow-sm text-[#1A1512] border border-white/60 overflow-hidden"
             >
@@ -525,41 +530,52 @@ export function MapViewInner({ items, onSelectItem, routeSegments, totalKm, legD
             offset={42}
             onClose={() => setSelectedItemId(null)}
             closeButton={false}
+            closeOnClick={false}
             maxWidth="200px"
           >
-            <div style={{ minWidth: 160, padding: 4 }}>
-              <div
-                className="cursor-pointer"
-                onClick={() => { setSelectedItemId(null); setTimeout(() => onSelectItem(selectedItem.id), 50); }}
-              >
-                <p style={{ fontWeight: 700, fontSize: 14, marginBottom: 2 }}>
+            <div style={{ minWidth: 180, padding: "12px 14px 12px" }}>
+              <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 8, marginBottom: 4 }}>
+                <p style={{ fontWeight: 700, fontSize: 14, margin: 0, flex: 1 }}>
                   {ITEM_EMOJI[selectedItem.type] ?? "📌"} {selectedItem.title}
                 </p>
-                {selectedItem.locationName && (
-                  <p style={{ fontSize: 12, color: "#6B6560", marginBottom: 4 }}>{selectedItem.locationName}</p>
-                )}
-                {selectedItem.startTime && (
-                  <p style={{ fontSize: 12, color: "#A09B96" }}>
-                    {new Date(selectedItem.startTime).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}
-                  </p>
-                )}
-                <p style={{ fontSize: 12, color: "#E8622A", fontWeight: 600, marginTop: 6 }}>View details →</p>
+                <button
+                  onClick={() => setSelectedItemId(null)}
+                  style={{ flexShrink: 0, width: 22, height: 22, borderRadius: "50%", background: "#F0EDE8", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, color: "#6B6560", lineHeight: 1 }}
+                >
+                  ×
+                </button>
               </div>
-              <a
-                href={`https://maps.google.com?q=${selectedItem.locationLat},${selectedItem.locationLng}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                style={{ display: "block", marginTop: 6, textAlign: "center", fontSize: 12, color: "#2D6A8F", textDecoration: "underline" }}
-              >
-                Open in Maps ↗
-              </a>
+              {selectedItem.locationName && (
+                <p style={{ fontSize: 12, color: "#6B6560", margin: "0 0 4px" }}>{selectedItem.locationName}</p>
+              )}
+              {selectedItem.startTime && (
+                <p style={{ fontSize: 12, color: "#A09B96", margin: "0 0 8px" }}>
+                  {new Date(selectedItem.startTime).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}
+                </p>
+              )}
+              <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+                <button
+                  onClick={() => { setSelectedItemId(null); setTimeout(() => onSelectItem(selectedItem.id), 50); }}
+                  style={{ flex: 1, padding: "6px 0", borderRadius: 8, background: "#E8622A", color: "#fff", fontSize: 12, fontWeight: 600, border: "none", cursor: "pointer" }}
+                >
+                  View details
+                </button>
+                <a
+                  href={`https://maps.google.com?q=${selectedItem.locationLat},${selectedItem.locationLng}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{ flex: 1, padding: "6px 0", borderRadius: 8, background: "#F0EDE8", color: "#2D6A8F", fontSize: 12, fontWeight: 600, textAlign: "center", textDecoration: "none", display: "block" }}
+                >
+                  Maps ↗
+                </a>
+              </div>
             </div>
           </Popup>
         )}
 
         <LocateControl onLocate={(lng, lat) => setUserPos({ lng, lat })} />
         <CompassReset />
-        <ItemChips pinned={pinned} positions={positions} legDistances={legDistances} legDurations={legDurations} />
+        <ItemChips pinned={pinned} positions={positions} legDistances={legDistances} legDurations={legDurations} onSelect={setSelectedItemId} />
       </Map>
     </div>
   );
