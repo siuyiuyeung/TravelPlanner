@@ -33,6 +33,16 @@ type Props = {
 
 const MAPBOX_TOKEN = process.env.NEXT_PUBLIC_MAPBOX_TOKEN ?? "";
 
+const ROUTE_COLORS = [
+  "#1A73E8",
+  "#E8622A",
+  "#22C55E",
+  "#9333EA",
+  "#EF4444",
+  "#14B8A6",
+  "#F59E0B",
+];
+
 const STYLES = {
   streets: "mapbox://styles/mapbox/streets-v12",
   outdoors: "mapbox://styles/mapbox/outdoors-v12",
@@ -312,14 +322,14 @@ export function MapViewInner({ items, onSelectItem, routeSegments, totalKm, legD
     type: "FeatureCollection",
     features: routeSegments
       .filter((seg) => seg.length > 1)
-      .map((seg) => ({
+      .map((seg, i) => ({
         type: "Feature",
         geometry: {
           type: "LineString",
           // incoming segments are [lat, lng] — flip to [lng, lat] for GL
           coordinates: seg.map(([lat, lng]) => [lng, lat]),
         },
-        properties: {},
+        properties: { color: ROUTE_COLORS[i % ROUTE_COLORS.length] },
       })),
   };
 
@@ -479,7 +489,7 @@ export function MapViewInner({ items, onSelectItem, routeSegments, totalKm, legD
           <Layer
             id="route-line"
             type="line"
-            paint={{ "line-color": "#1A73E8", "line-width": 6, "line-opacity": 1 }}
+            paint={{ "line-color": ["get", "color"], "line-width": 6, "line-opacity": 1 }}
             layout={{ "line-cap": "round", "line-join": "round" }}
           />
         </Source>
