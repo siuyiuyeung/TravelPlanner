@@ -702,9 +702,11 @@ export function TripDetailClient({ tripId, userId }: Props) {
       {tab === "itinerary" && (
         <button
           onClick={() => setAddItemOpen(true)}
-          className="fixed bottom-24 right-5 w-14 h-14 bg-[#E8622A] rounded-full shadow-[0_4px_16px_rgba(232,98,42,0.40)] flex items-center justify-center text-white text-2xl z-40"
+          className="fixed bottom-24 right-5 w-10 h-10 bg-[#E8622A] rounded-full shadow-[0_4px_16px_rgba(232,98,42,0.40)] flex items-center justify-center text-white z-40"
         >
-          +
+          <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true">
+            <path d="M9 3v12M3 9h12" stroke="currentColor" strokeWidth="2.25" strokeLinecap="round" />
+          </svg>
         </button>
       )}
 

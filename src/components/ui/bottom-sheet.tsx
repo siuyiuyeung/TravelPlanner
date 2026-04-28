@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect } from "react";
 import { Drawer } from "vaul";
 import { cn } from "@/lib/utils";
 
@@ -9,7 +10,58 @@ type BottomSheetProps = {
   children: React.ReactNode;
 };
 
+// Vaul's repositionInputs checks document.activeElement when visualViewport
+// resizes, but on mobile the resize fires during keyboard animation before
+// activeElement updates. This supplement fires after the animation settles.
+function useKeyboardRepositionFix(open: boolean) {
+  useEffect(() => {
+    if (!open || typeof window === "undefined") return;
+    const vv = window.visualViewport;
+    if (!vv) return;
+
+    function applyReposition() {
+      const kb = Math.round(window.innerHeight - (vv?.height ?? window.innerHeight));
+      const el = document.querySelector("[data-vaul-drawer]") as HTMLElement | null;
+      if (!el) return;
+      const current = parseInt(el.style.bottom || "0", 10);
+      if (kb > 50 && current < kb - 20) {
+        el.style.bottom = `${kb}px`;
+      }
+    }
+
+    function onFocusIn(e: FocusEvent) {
+      const target = e.target as Element | null;
+      if (
+        target?.closest("[data-vaul-drawer]") &&
+        target.matches("input, textarea, [contenteditable]")
+      ) {
+        setTimeout(applyReposition, 150);
+        setTimeout(applyReposition, 400);
+      }
+    }
+
+    function onFocusOut() {
+      setTimeout(() => {
+        const active = document.activeElement;
+        if (!active?.matches("input, textarea, [contenteditable]")) {
+          const el = document.querySelector("[data-vaul-drawer]") as HTMLElement | null;
+          if (el) el.style.bottom = "0px";
+        }
+      }, 150);
+    }
+
+    document.addEventListener("focusin", onFocusIn);
+    document.addEventListener("focusout", onFocusOut);
+    return () => {
+      document.removeEventListener("focusin", onFocusIn);
+      document.removeEventListener("focusout", onFocusOut);
+    };
+  }, [open]);
+}
+
 export function BottomSheet({ open, onOpenChange, children }: BottomSheetProps) {
+  useKeyboardRepositionFix(open);
+
   return (
     <Drawer.Root open={open} onOpenChange={onOpenChange}>
       <Drawer.Portal>

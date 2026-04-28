@@ -3,8 +3,8 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import dynamic from "next/dynamic";
 
-const MapPickerMini = dynamic(
-  () => import("./MapPickerMini").then((m) => ({ default: m.MapPickerMini })),
+const LocationPickerOverlay = dynamic(
+  () => import("./LocationPickerOverlay").then((m) => ({ default: m.LocationPickerOverlay })),
   { ssr: false }
 );
 
@@ -26,7 +26,8 @@ export function LocationAutocomplete({ value, onChange, placeholder = "Search fo
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
   const [open, setOpen] = useState(false);
   const [activeIdx, setActiveIdx] = useState(-1);
-  const [showMap, setShowMap] = useState(false);
+  const [showOverlay, setShowOverlay] = useState(false);
+  const [overlayInit, setOverlayInit] = useState<{ lat: number; lng: number } | null>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const committed = useRef(false); // true after user picks a suggestion
@@ -122,13 +123,16 @@ export function LocationAutocomplete({ value, onChange, placeholder = "Search fo
         />
         <button
           type="button"
-          onClick={() => setShowMap((v) => !v)}
+          onClick={() => {
+            setOverlayInit(
+              latRef.current && lngRef.current
+                ? { lat: parseFloat(latRef.current), lng: parseFloat(lngRef.current) }
+                : null,
+            );
+            setShowOverlay(true);
+          }}
           title="Pick on map"
-          className={`flex-shrink-0 w-11 h-11 flex items-center justify-center rounded-[10px] border transition-colors ${
-            showMap
-              ? "border-[#E8622A] bg-[rgba(232,98,42,0.08)] text-[#E8622A]"
-              : "border-[#E5E0DA] bg-[#F0EDE8] text-[#6B6560]"
-          }`}
+          className="flex-shrink-0 w-11 h-11 flex items-center justify-center rounded-[10px] border border-[#E5E0DA] bg-[#F0EDE8] text-[#6B6560] hover:border-[#E8622A] hover:bg-[rgba(232,98,42,0.08)] hover:text-[#E8622A] transition-colors"
         >
           📍
         </button>
@@ -159,20 +163,19 @@ export function LocationAutocomplete({ value, onChange, placeholder = "Search fo
         </ul>
       )}
 
-      {showMap && (
-        <div className="mt-2">
-          <MapPickerMini
-            initialLat={latRef.current ? parseFloat(latRef.current) : undefined}
-            initialLng={lngRef.current ? parseFloat(lngRef.current) : undefined}
-            onPick={(lat, lng, placeName) => {
-              latRef.current = lat;
-              lngRef.current = lng;
-              committed.current = true;
-              onChange(placeName, lat, lng);
-              setShowMap(false);
-            }}
-          />
-        </div>
+      {showOverlay && (
+        <LocationPickerOverlay
+          {...(overlayInit ? { initialLat: overlayInit.lat, initialLng: overlayInit.lng } : {})}
+          initialName={value}
+          onConfirm={(locationName, lat, lng) => {
+            latRef.current = lat;
+            lngRef.current = lng;
+            committed.current = true;
+            onChange(locationName, lat, lng);
+            setShowOverlay(false);
+          }}
+          onClose={() => setShowOverlay(false)}
+        />
       )}
     </div>
   );
