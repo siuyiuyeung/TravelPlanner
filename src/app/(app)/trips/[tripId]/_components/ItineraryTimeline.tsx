@@ -433,7 +433,7 @@ function ItemCard({
           </div>
           {legMode !== "none" && (
             <span className="text-[11px] font-semibold text-[#A09B96] font-mono flex-shrink-0">
-              {ROUTE_MODE_ICON[legMode]} {formatLegDist(legKm)}
+              {formatLegDist(legKm)}
               {legDuration !== undefined && legDuration > 0 ? ` · ${formatLegDuration(legDuration)}` : ""}
             </span>
           )}
