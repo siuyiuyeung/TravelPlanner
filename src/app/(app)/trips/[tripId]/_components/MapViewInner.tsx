@@ -192,15 +192,16 @@ function ItemChips({
   positions,
   legDistances,
   legDurations,
+  mapRef,
   onSelect,
 }: {
   pinned: MapItem[];
   positions: { lng: number; lat: number }[];
   legDistances?: Record<string, number> | undefined;
   legDurations?: Record<string, number> | undefined;
+  mapRef: React.RefObject<MapRef | null>;
   onSelect: (id: string) => void;
 }) {
-  const { current: mapRef } = useMap();
   const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -208,14 +209,8 @@ function ItemChips({
     if (!el) return;
     const stop = (e: Event) => e.stopPropagation();
     el.addEventListener("wheel", stop, { passive: false });
-    el.addEventListener("touchstart", stop, { passive: false });
-    el.addEventListener("touchmove", stop, { passive: false });
-    el.addEventListener("click", stop);
     return () => {
       el.removeEventListener("wheel", stop);
-      el.removeEventListener("touchstart", stop);
-      el.removeEventListener("touchmove", stop);
-      el.removeEventListener("click", stop);
     };
   }, []);
 
@@ -229,6 +224,7 @@ function ItemChips({
         pointerEvents: "auto", display: "flex", alignItems: "center",
         overflowX: "auto", WebkitOverflowScrolling: "touch",
         padding: "0 12px", gap: 0, scrollbarWidth: "none",
+        touchAction: "pan-x",
       } as React.CSSProperties}
     >
       {pinned.map((item, idx) => {
@@ -243,7 +239,7 @@ function ItemChips({
             <button
               style={{ flexShrink: 0 }}
               onClick={(e) => {
-                mapRef?.flyTo({ center: [pos.lng, pos.lat], zoom: 16, animate: true });
+                mapRef.current?.flyTo({ center: [pos.lng, pos.lat], zoom: 16, animate: true });
                 e.currentTarget.scrollIntoView({ behavior: "smooth", inline: "center", block: "nearest" });
                 onSelect(item.id);
               }}
@@ -575,8 +571,8 @@ export function MapViewInner({ items, onSelectItem, routeSegments, totalKm, legD
 
         <LocateControl onLocate={(lng, lat) => setUserPos({ lng, lat })} />
         <CompassReset />
-        <ItemChips pinned={pinned} positions={positions} legDistances={legDistances} legDurations={legDurations} onSelect={setSelectedItemId} />
       </Map>
+      <ItemChips pinned={pinned} positions={positions} legDistances={legDistances} legDurations={legDurations} mapRef={mapRef} onSelect={setSelectedItemId} />
     </div>
   );
 }
