@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { headers } from "next/headers";
 import { auth } from "@/server/auth";
 import { BottomNav } from "@/components/navigation/BottomNav";
+import { ScrollButtons } from "@/components/navigation/ScrollButtons";
 import { Onboarding } from "@/components/Onboarding";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
@@ -16,10 +17,11 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   return (
     <div className="flex flex-col h-full min-h-screen bg-[#FAF8F5]">
       <Onboarding />
-      <main className="flex-1 overflow-y-auto" style={{ paddingBottom: 'calc(58px + env(safe-area-inset-bottom, 0px))' }}>
+      <main id="main-scroll" className="flex-1 overflow-y-auto" style={{ paddingBottom: 'calc(58px + env(safe-area-inset-bottom, 0px))' }}>
         {children}
       </main>
       <BottomNav />
+      <ScrollButtons />
     </div>
   );
 }
