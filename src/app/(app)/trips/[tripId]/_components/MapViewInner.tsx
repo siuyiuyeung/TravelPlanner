@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import Map, {
   Layer,
   Marker,
@@ -11,6 +11,19 @@ import Map, {
 } from "react-map-gl/mapbox";
 import type { GeoJSON } from "geojson";
 import "mapbox-gl/dist/mapbox-gl.css";
+
+type PoiFeature = {
+  type: "Feature";
+  geometry: {
+    type: "Point";
+    coordinates: [number, number]; // [lng, lat]
+  };
+  properties: {
+    name: string;
+    full_address?: string;
+    place_formatted?: string;
+  };
+};
 
 type MapItem = {
   id: string;
@@ -55,6 +68,15 @@ const STYLE_LABELS: Record<StyleKey, string> = {
   outdoors: "Outdoors",
   satellite: "Satellite",
 };
+
+const POI_CATEGORIES = [
+  { id: "gas_station",   label: "Gas Station",   icon: "⛽", keyword: "fuel" },
+  { id: "toilet",        label: "Toilet",         icon: "🚻", keyword: "toilet" },
+  { id: "attraction",    label: "Attraction",     icon: "🎡", keyword: "tourist_attraction" },
+  { id: "restaurant",    label: "Restaurant",     icon: "🍜", keyword: "restaurant" },
+  { id: "supermarket",   label: "Supermarket",    icon: "🛒", keyword: "supermarket" },
+  { id: "accommodation", label: "Accommodation",  icon: "🏨", keyword: "hotel" },
+] as const;
 
 const ITEM_EMOJI: Record<string, string> = {
   flight: "✈️",
@@ -347,6 +369,12 @@ export function MapViewInner({ items, onSelectItem, routeSegments, totalKm, legD
   const [styleOpen, setStyleOpen] = useState(false);
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
   const [userPos, setUserPos] = useState<{ lng: number; lat: number } | null>(null);
+  const [showRoutes, setShowRoutes] = useState(true);
+  const [showPoiPanel, setShowPoiPanel] = useState(false);
+  const [activePoiCategory, setActivePoiCategory] = useState<string | null>(null);
+  const [poiResults, setPoiResults] = useState<PoiFeature[]>([]);
+  const [poiLoading, setPoiLoading] = useState(false);
+  const [selectedPoi, setSelectedPoi] = useState<PoiFeature | null>(null);
 
   const pinned = items.filter((i) => i.locationLat !== null && i.locationLng !== null);
   const positions = pinned.map((i) => ({
@@ -387,6 +415,43 @@ export function MapViewInner({ items, onSelectItem, routeSegments, totalKm, legD
       }
     : null;
 
+  const fetchPoi = useCallback(async (category: (typeof POI_CATEGORIES)[number]) => {
+    const map = mapRef.current?.getMap();
+    const center = map?.getCenter() ?? { lng: 114.1694, lat: 22.3193 };
+    setPoiLoading(true);
+    setPoiResults([]);
+    setSelectedPoi(null);
+    try {
+      const url = new URL(
+        `https://api.mapbox.com/search/searchbox/v1/category/${category.keyword}`,
+      );
+      url.searchParams.set("proximity", `${center.lng},${center.lat}`);
+      url.searchParams.set("limit", "15");
+      url.searchParams.set("access_token", MAPBOX_TOKEN);
+      const res = await fetch(url.toString());
+      const data = (await res.json()) as { features: PoiFeature[] };
+      setPoiResults(data.features ?? []);
+    } finally {
+      setPoiLoading(false);
+    }
+  }, []);
+
+  const handlePoiCategorySelect = useCallback(
+    async (categoryId: string) => {
+      if (activePoiCategory === categoryId) {
+        setActivePoiCategory(null);
+        setPoiResults([]);
+        setSelectedPoi(null);
+        return;
+      }
+      const category = POI_CATEGORIES.find((c) => c.id === categoryId);
+      if (!category) return;
+      setActivePoiCategory(categoryId);
+      await fetchPoi(category);
+    },
+    [activePoiCategory, fetchPoi],
+  );
+
   function handleLoad() {
     if (positions.length === 0 || fitted.current) return;
     fitted.current = true;
@@ -414,6 +479,90 @@ export function MapViewInner({ items, onSelectItem, routeSegments, totalKm, legD
           </div>
         </div>
       )}
+
+      {/* POI panel */}
+      <div
+        tabIndex={-1}
+        onBlur={(e) => {
+          if (!e.currentTarget.contains(e.relatedTarget as Node)) {
+            setShowPoiPanel(false);
+          }
+        }}
+        style={{ position: "absolute", bottom: "calc(302px + env(safe-area-inset-bottom, 0px))", right: 12, zIndex: 3, outline: "none" }}
+      >
+        <button
+          onClick={() => setShowPoiPanel((o) => !o)}
+          title="Nearby places"
+          style={{
+            width: 40, height: 40, borderRadius: "50%", background: "#fff", border: "none",
+            boxShadow: "0 2px 8px rgba(0,0,0,0.25)", display: "flex", alignItems: "center",
+            justifyContent: "center", cursor: "pointer",
+            color: showPoiPanel || activePoiCategory ? "#1A73E8" : "#1A1512",
+          }}
+        >
+          {poiLoading ? (
+            <div style={{ width: 18, height: 18, border: "2.5px solid #1A73E8", borderTopColor: "transparent", borderRadius: "50%", animation: "spin 0.7s linear infinite" }} />
+          ) : (
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
+              <line x1="11" y1="8" x2="11" y2="14" /><line x1="8" y1="11" x2="14" y2="11" />
+            </svg>
+          )}
+        </button>
+        {showPoiPanel && (
+          <div style={{
+            position: "absolute", bottom: 0, right: 48,
+            background: "rgba(255,255,255,0.97)", backdropFilter: "blur(8px)",
+            borderRadius: 14, boxShadow: "0 4px 20px rgba(0,0,0,0.18)",
+            padding: "6px 0", minWidth: 164,
+            border: "1px solid rgba(229,224,218,0.6)",
+          }}>
+            {POI_CATEGORIES.map((cat) => (
+              <button
+                key={cat.id}
+                onClick={() => handlePoiCategorySelect(cat.id)}
+                style={{
+                  display: "flex", alignItems: "center", gap: 10, width: "100%",
+                  padding: "10px 16px", background: activePoiCategory === cat.id ? "#EFF6FF" : "transparent",
+                  border: "none", cursor: "pointer", fontSize: 13,
+                  color: activePoiCategory === cat.id ? "#1D4ED8" : "#374151",
+                  fontWeight: activePoiCategory === cat.id ? 600 : 400,
+                  borderLeft: activePoiCategory === cat.id ? "3px solid #1D4ED8" : "3px solid transparent",
+                }}
+              >
+                <span style={{ fontSize: 16 }}>{cat.icon}</span>
+                <span>{cat.label}</span>
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Route toggle button */}
+      <div style={{ position: "absolute", bottom: "calc(254px + env(safe-area-inset-bottom, 0px))", right: 12, zIndex: 3 }}>
+        <button
+          onClick={() => setShowRoutes((v) => !v)}
+          title={showRoutes ? "Hide routes" : "Show routes"}
+          style={{
+            width: 40, height: 40, borderRadius: "50%", background: "#fff", border: "none",
+            boxShadow: "0 2px 8px rgba(0,0,0,0.25)", display: "flex", alignItems: "center",
+            justifyContent: "center", cursor: "pointer",
+            color: showRoutes ? "#1A1512" : "#A09B96",
+          }}
+        >
+          {showRoutes ? (
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" /><circle cx="12" cy="12" r="3" />
+            </svg>
+          ) : (
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94" />
+              <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19" />
+              <line x1="1" y1="1" x2="23" y2="23" />
+            </svg>
+          )}
+        </button>
+      </div>
 
       {/* Style switcher — compact layers button */}
       <div
@@ -527,13 +676,13 @@ export function MapViewInner({ items, onSelectItem, routeSegments, totalKm, legD
             id="route-casing"
             type="line"
             paint={{ "line-color": "#ffffff", "line-width": 10, "line-opacity": 0.9 }}
-            layout={{ "line-cap": "round", "line-join": "round" }}
+            layout={{ "line-cap": "round", "line-join": "round", visibility: showRoutes ? "visible" : "none" }}
           />
           <Layer
             id="route-line"
             type="line"
             paint={{ "line-color": ["get", "color"], "line-width": 6, "line-opacity": 1 }}
-            layout={{ "line-cap": "round", "line-join": "round" }}
+            layout={{ "line-cap": "round", "line-join": "round", visibility: showRoutes ? "visible" : "none" }}
           />
         </Source>
 
@@ -563,7 +712,7 @@ export function MapViewInner({ items, onSelectItem, routeSegments, totalKm, legD
               longitude={pos.lng}
               latitude={pos.lat}
               anchor="bottom"
-              onClick={() => setSelectedItemId(item.id)}
+              onClick={() => { setSelectedPoi(null); setSelectedItemId(item.id); }}
             >
               <MarkerPin emoji={emoji} seq={idx + 1} />
             </Marker>
@@ -618,6 +767,74 @@ export function MapViewInner({ items, onSelectItem, routeSegments, totalKm, legD
                   Maps ↗
                 </a>
               </div>
+            </div>
+          </Popup>
+        )}
+
+        {/* POI markers */}
+        {poiResults.map((poi) => {
+          const activeCat = POI_CATEGORIES.find((c) => c.id === activePoiCategory);
+          return (
+            <Marker
+              key={`${poi.geometry.coordinates[0]}-${poi.geometry.coordinates[1]}`}
+              longitude={poi.geometry.coordinates[0]}
+              latitude={poi.geometry.coordinates[1]}
+              anchor="bottom"
+              onClick={(e) => {
+                e.originalEvent.stopPropagation();
+                setSelectedItemId(null);
+                setSelectedPoi(poi);
+              }}
+            >
+              <div style={{
+                width: 30, height: 30, borderRadius: "50%", background: "#F59E0B",
+                border: "2px solid white", display: "flex", alignItems: "center",
+                justifyContent: "center", fontSize: 14, cursor: "pointer",
+                boxShadow: "0 1px 4px rgba(0,0,0,0.35)",
+              }}>
+                {activeCat?.icon ?? "📍"}
+              </div>
+            </Marker>
+          );
+        })}
+
+        {/* POI popup */}
+        {selectedPoi && (
+          <Popup
+            longitude={selectedPoi.geometry.coordinates[0]}
+            latitude={selectedPoi.geometry.coordinates[1]}
+            anchor="bottom"
+            offset={18}
+            onClose={() => setSelectedPoi(null)}
+            closeButton={false}
+            closeOnClick={false}
+            maxWidth="220px"
+          >
+            <div style={{ minWidth: 190, padding: "12px 14px 12px" }}>
+              <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 8, marginBottom: 4 }}>
+                <p style={{ fontWeight: 700, fontSize: 14, margin: 0, flex: 1 }}>
+                  {selectedPoi.properties.name}
+                </p>
+                <button
+                  onClick={() => setSelectedPoi(null)}
+                  style={{ flexShrink: 0, width: 22, height: 22, borderRadius: "50%", background: "#F0EDE8", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, color: "#6B6560", lineHeight: 1 }}
+                >
+                  ×
+                </button>
+              </div>
+              {(selectedPoi.properties.full_address ?? selectedPoi.properties.place_formatted) && (
+                <p style={{ fontSize: 12, color: "#6B6560", margin: "0 0 10px" }}>
+                  {selectedPoi.properties.full_address ?? selectedPoi.properties.place_formatted}
+                </p>
+              )}
+              <a
+                href={`https://www.google.com/maps/dir/?api=1&destination=${selectedPoi.geometry.coordinates[1]},${selectedPoi.geometry.coordinates[0]}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{ display: "block", textAlign: "center", padding: "6px 12px", background: "#1A73E8", color: "white", borderRadius: 8, fontSize: 12, fontWeight: 600, textDecoration: "none" }}
+              >
+                Directions ↗
+              </a>
             </div>
           </Popup>
         )}
