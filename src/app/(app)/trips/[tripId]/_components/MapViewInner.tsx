@@ -151,7 +151,7 @@ function LocateControl({ onLocate }: { onLocate: (lng: number, lat: number) => v
   }
 
   return (
-    <div style={{ position: "absolute", bottom: 24, right: 12, zIndex: 2 }}>
+    <div style={{ position: "absolute", bottom: "calc(110px + env(safe-area-inset-bottom, 0px))", right: 12, zIndex: 2 }}>
       <button
         onClick={handleLocate}
         title="Go to my location"
@@ -180,18 +180,40 @@ function LocateControl({ onLocate }: { onLocate: (lng: number, lat: number) => v
 
 function CompassReset() {
   const { current: mapRef } = useMap();
+  const [bearing, setBearing] = useState(0);
+
+  useEffect(() => {
+    if (!mapRef) return;
+    const map = mapRef.getMap();
+    const update = () => setBearing(map.getBearing());
+    map.on("rotate", update);
+    update();
+    return () => { map.off("rotate", update); };
+  }, [mapRef]);
+
   return (
-    <div style={{ position: "absolute", bottom: 24, right: 60, zIndex: 2 }}>
+    <div style={{ position: "absolute", bottom: "calc(158px + env(safe-area-inset-bottom, 0px))", right: 12, zIndex: 2 }}>
       <button
         onClick={() => mapRef?.easeTo({ pitch: 0, bearing: 0, duration: 500 })}
         title="Reset pitch and rotation"
         style={{
           width: 40, height: 40, borderRadius: "50%", background: "#fff", border: "none",
           boxShadow: "0 2px 8px rgba(0,0,0,0.25)", display: "flex", alignItems: "center",
-          justifyContent: "center", cursor: "pointer", fontSize: 18,
+          justifyContent: "center", cursor: "pointer",
         }}
       >
-        🧭
+        <svg
+          width="22"
+          height="22"
+          viewBox="0 0 22 22"
+          style={{ transform: `rotate(${-bearing}deg)`, transition: "transform 0.1s ease-out" }}
+        >
+          {/* North — red */}
+          <path d="M11 2 L13.2 11 L11 10 L8.8 11 Z" fill="#DB4437" />
+          {/* South — gray */}
+          <path d="M11 20 L13.2 11 L11 12 L8.8 11 Z" fill="#9E9E9E" />
+          <circle cx="11" cy="11" r="1.8" fill="white" stroke="#ccc" strokeWidth="0.5" />
+        </svg>
       </button>
     </div>
   );
@@ -230,7 +252,7 @@ function ItemChips({
     <div
       ref={containerRef}
       style={{
-        position: "absolute", bottom: 72, left: 0, right: 0, zIndex: 2,
+        position: "absolute", bottom: "calc(66px + env(safe-area-inset-bottom, 0px))", left: 0, right: 0, zIndex: 2,
         pointerEvents: "auto", display: "flex", alignItems: "center",
         overflowX: "auto", WebkitOverflowScrolling: "touch",
         padding: "0 12px", gap: 0, scrollbarWidth: "none",
@@ -287,12 +309,33 @@ function TerrainSetter() {
   useEffect(() => {
     if (!mapRef) return;
     const map = mapRef.getMap();
-    function applyTerrain() {
-      map.setTerrain({ source: "mapbox-dem", exaggeration: 1.5 });
+    let applied = false;
+
+    function tryApplyTerrain() {
+      if (applied) return;
+      if (map.getSource("mapbox-dem")) {
+        map.setTerrain({ source: "mapbox-dem", exaggeration: 1.5 });
+        applied = true;
+        map.off("sourcedata", tryApplyTerrain);
+      }
     }
-    map.on("style.load", applyTerrain);
-    if (map.isStyleLoaded()) applyTerrain();
-    return () => { map.off("style.load", applyTerrain); };
+
+    function onStyleLoad() {
+      applied = false;
+      map.on("sourcedata", tryApplyTerrain);
+      tryApplyTerrain();
+    }
+
+    map.on("style.load", onStyleLoad);
+    if (map.isStyleLoaded()) {
+      map.on("sourcedata", tryApplyTerrain);
+      tryApplyTerrain();
+    }
+
+    return () => {
+      map.off("style.load", onStyleLoad);
+      map.off("sourcedata", tryApplyTerrain);
+    };
   }, [mapRef]);
   return null;
 }
@@ -380,7 +423,7 @@ export function MapViewInner({ items, onSelectItem, routeSegments, totalKm, legD
             setStyleOpen(false);
           }
         }}
-        style={{ position: "absolute", top: 12, right: 12, zIndex: 3, outline: "none" }}
+        style={{ position: "absolute", bottom: "calc(206px + env(safe-area-inset-bottom, 0px))", right: 12, zIndex: 3, outline: "none" }}
       >
         <button
           onClick={() => setStyleOpen((o) => !o)}
@@ -424,7 +467,7 @@ export function MapViewInner({ items, onSelectItem, routeSegments, totalKm, legD
 
       {/* Total km badge */}
       {totalKm !== undefined && totalKm > 0 && (
-        <div style={{ position: "absolute", bottom: 24, left: 12, zIndex: 2, pointerEvents: "none" }}>
+        <div style={{ position: "absolute", bottom: "calc(110px + env(safe-area-inset-bottom, 0px))", left: 12, zIndex: 2, pointerEvents: "none" }}>
           <div className="bg-white/95 backdrop-blur-sm rounded-full px-3 py-1.5 shadow-md flex items-center gap-1.5 border border-[#E5E0DA]">
             <span className="text-[12px]">🚗</span>
             <span className="text-[12px] font-semibold text-[#1A1512] font-mono">

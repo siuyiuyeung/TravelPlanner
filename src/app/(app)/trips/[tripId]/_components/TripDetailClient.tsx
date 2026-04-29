@@ -151,6 +151,7 @@ type RouteData = {
 export function TripDetailClient({ tripId, userId }: Props) {
   const router = useRouter();
   const [tab, setTab] = useState<"overview" | "itinerary" | "map" | "budget" | "pack" | "chat">("overview");
+  const [showMapOverlay, setShowMapOverlay] = useState(false);
   const [addItemOpen, setAddItemOpen] = useState(false);
   const [mapSelectedId, setMapSelectedId] = useState<string | null>(null);
   const [mapDay, setMapDay] = useState<string | null>(null);
@@ -160,6 +161,16 @@ export function TripDetailClient({ tripId, userId }: Props) {
   const [legDurations, setLegDurations] = useState<Record<string, number>>({});
   const [legCoords, setLegCoords] = useState<Record<string, [number, number][]>>({});
   const utils = api.useUtils();
+
+  const switchTab = useCallback((id: typeof tab) => {
+    setTab(id);
+    if (id === 'map') {
+      setTimeout(() => setShowMapOverlay(true), 300);
+    } else {
+      setShowMapOverlay(false);
+      document.getElementById('main-scroll')?.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  }, []);
 
   const { data: trip, isLoading } = api.trips.getById.useQuery({ tripId });
   const { data: tripAttachments = [] } = api.attachments.listByTrip.useQuery({ tripId });
@@ -418,33 +429,35 @@ export function TripDetailClient({ tripId, userId }: Props) {
         </div>
       )}
 
-      {/* Hero */}
-      <div className={`relative bg-gradient-to-br ${gradient} px-5 pt-14 pb-5`}>
-        <button
-          onClick={() => router.back()}
-          className="absolute top-14 left-5 w-9 h-9 rounded-full bg-white/15 flex items-center justify-center text-white"
-        >
-          ←
-        </button>
+      {/* Hero — collapses on Map tab */}
+      <div className={`overflow-hidden transition-[max-height] duration-300 ease-in-out ${tab === 'map' ? 'max-h-0' : 'max-h-[400px]'}`}>
+        <div className={`relative bg-gradient-to-br ${gradient} px-5 pt-14 pb-5`}>
+          <button
+            onClick={() => router.back()}
+            className="absolute top-14 left-5 w-9 h-9 rounded-full bg-white/15 flex items-center justify-center text-white"
+          >
+            ←
+          </button>
 
-        <div className="mt-8">
-          <p className="text-white/60 text-xs font-medium mb-1">{trip.group.name}</p>
-          <h1 className="text-[28px] font-bold text-white leading-tight">{trip.name}</h1>
-          {(trip.startDate || trip.destination) && (
-            <p className="text-white/70 text-sm mt-1">
-              {trip.destination ? `📍 ${trip.destination}` : ""}
-              {trip.startDate ? `${trip.destination ? " · " : ""}${trip.startDate}${trip.endDate ? ` – ${trip.endDate}` : ""}` : ""}
-            </p>
-          )}
-          <div className="mt-4">
-            <AvatarStack members={trip.group.members} />
+          <div className="mt-8">
+            <p className="text-white/60 text-xs font-medium mb-1">{trip.group.name}</p>
+            <h1 className="text-[28px] font-bold text-white leading-tight">{trip.name}</h1>
+            {(trip.startDate || trip.destination) && (
+              <p className="text-white/70 text-sm mt-1">
+                {trip.destination ? `📍 ${trip.destination}` : ""}
+                {trip.startDate ? `${trip.destination ? " · " : ""}${trip.startDate}${trip.endDate ? ` – ${trip.endDate}` : ""}` : ""}
+              </p>
+            )}
+            <div className="mt-4">
+              <AvatarStack members={trip.group.members} />
+            </div>
+            <PresenceRow presence={trip.presence} userId={userId} />
           </div>
-          <PresenceRow presence={trip.presence} userId={userId} />
         </div>
       </div>
 
       {/* Tab bar */}
-      <div className="bg-white border-b border-[#E5E0DA] flex">
+      <div className="bg-white border-b border-[#E5E0DA] flex sticky top-0 z-20">
         {(
           [
             { id: "overview", label: "Home" },
@@ -457,7 +470,7 @@ export function TripDetailClient({ tripId, userId }: Props) {
         ).map(({ id, label }) => (
           <button
             key={id}
-            onClick={() => setTab(id)}
+            onClick={() => switchTab(id)}
             className={`flex-1 py-3 text-[11px] font-semibold transition-colors ${
               tab === id
                 ? "text-[#E8622A] border-b-2 border-[#E8622A]"
@@ -601,82 +614,7 @@ export function TripDetailClient({ tripId, userId }: Props) {
           />
         )}
 
-        {tab === "map" && (
-          <>
-            <MapView
-              items={mapFilteredPinnedItems}
-              onSelectItem={(id) => setMapSelectedId(id)}
-              routeSegments={routeSegments}
-              totalKm={totalKm || routeData?.totalKm}
-              legDistances={legDistances}
-              legDurations={legDurations}
-            />
-            {showMapFilter && (
-              <div
-                style={{ position: "absolute", top: 12, left: 0, right: 0, zIndex: 10, pointerEvents: "none" } as React.CSSProperties}
-                className="flex gap-2 px-4 overflow-x-auto"
-              >
-                {mapChips.map(chip => (
-                  <button
-                    key={chip.key ?? "all"}
-                    onClick={() => setMapDay(mapDay === chip.key ? null : chip.key)}
-                    style={{ pointerEvents: "auto" }}
-                    className={`flex-shrink-0 px-3.5 py-1.5 rounded-full text-[12px] font-semibold transition-colors shadow-sm ${
-                      mapDay === chip.key
-                        ? "bg-[#E8622A] text-white"
-                        : "bg-white/90 text-[#6B6560]"
-                    }`}
-                  >
-                    {chip.label}
-                  </button>
-                ))}
-              </div>
-            )}
-            <BottomSheet
-              open={mapSelectedId !== null}
-              onOpenChange={(open) => { if (!open) setMapSelectedId(null); }}
-            >
-              {(() => {
-                const item = trip.itineraryItems.find((i) => i.id === mapSelectedId);
-                if (!item) return null;
-                const emoji = ITEM_EMOJI[item.type] ?? "📌";
-                return (
-                  <div className="px-5 pb-8 space-y-3">
-                    <BottomSheetTitle>{emoji} {item.title}</BottomSheetTitle>
-                    {item.locationName && (
-                      <p className="text-sm text-[#6B6560]">📍 {item.locationName}</p>
-                    )}
-                    {item.startTime && (
-                      <p className="text-sm text-[#6B6560]">
-                        🕐{" "}
-                        {new Date(item.startTime).toLocaleString("en-US", {
-                          weekday: "short",
-                          month: "short",
-                          day: "numeric",
-                          hour: "numeric",
-                          minute: "2-digit",
-                        })}
-                      </p>
-                    )}
-                    {item.description && (
-                      <p className="text-sm text-[#1A1512]">{item.description}</p>
-                    )}
-                    {item.url && (
-                      <a
-                        href={item.url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="block text-sm text-[#E8622A] font-medium underline truncate"
-                      >
-                        {item.url}
-                      </a>
-                    )}
-                  </div>
-                );
-              })()}
-            </BottomSheet>
-          </>
-        )}
+        {/* map rendered in fixed overlay outside content div */}
 
         {tab === "budget" && (
           <BudgetTab
@@ -697,6 +635,86 @@ export function TripDetailClient({ tripId, userId }: Props) {
           <CommentThread tripId={trip.id} userId={userId} />
         )}
       </div>
+
+      {/* Map fixed overlay — rendered after 300ms hero collapse, z-10 sits below sticky tab bar (z-20) and bottom nav (z-50) */}
+      {showMapOverlay && (
+        <>
+          <div style={{ position: "fixed", inset: 0, zIndex: 10, display: "flex", flexDirection: "column" }}>
+            <MapView
+              items={mapFilteredPinnedItems}
+              onSelectItem={(id) => setMapSelectedId(id)}
+              routeSegments={routeSegments}
+              totalKm={totalKm || routeData?.totalKm}
+              legDistances={legDistances}
+              legDurations={legDurations}
+            />
+            {showMapFilter && (
+              <div
+                style={{ position: "absolute", top: 56, left: 0, right: 0, zIndex: 10, pointerEvents: "none" } as React.CSSProperties}
+                className="flex gap-2 px-4 overflow-x-auto"
+              >
+                {mapChips.map(chip => (
+                  <button
+                    key={chip.key ?? "all"}
+                    onClick={() => setMapDay(mapDay === chip.key ? null : chip.key)}
+                    style={{ pointerEvents: "auto" }}
+                    className={`flex-shrink-0 px-3.5 py-1.5 rounded-full text-[12px] font-semibold transition-colors shadow-sm ${
+                      mapDay === chip.key
+                        ? "bg-[#E8622A] text-white"
+                        : "bg-white/90 text-[#6B6560]"
+                    }`}
+                  >
+                    {chip.label}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+          <BottomSheet
+            open={mapSelectedId !== null}
+            onOpenChange={(open) => { if (!open) setMapSelectedId(null); }}
+          >
+            {(() => {
+              const item = trip.itineraryItems.find((i) => i.id === mapSelectedId);
+              if (!item) return null;
+              const emoji = ITEM_EMOJI[item.type] ?? "📌";
+              return (
+                <div className="px-5 pb-8 space-y-3">
+                  <BottomSheetTitle>{emoji} {item.title}</BottomSheetTitle>
+                  {item.locationName && (
+                    <p className="text-sm text-[#6B6560]">📍 {item.locationName}</p>
+                  )}
+                  {item.startTime && (
+                    <p className="text-sm text-[#6B6560]">
+                      🕐{" "}
+                      {new Date(item.startTime).toLocaleString("en-US", {
+                        weekday: "short",
+                        month: "short",
+                        day: "numeric",
+                        hour: "numeric",
+                        minute: "2-digit",
+                      })}
+                    </p>
+                  )}
+                  {item.description && (
+                    <p className="text-sm text-[#1A1512]">{item.description}</p>
+                  )}
+                  {item.url && (
+                    <a
+                      href={item.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="block text-sm text-[#E8622A] font-medium underline truncate"
+                    >
+                      {item.url}
+                    </a>
+                  )}
+                </div>
+              );
+            })()}
+          </BottomSheet>
+        </>
+      )}
 
       {/* FAB — only on Plan tab */}
       {tab === "itinerary" && (
