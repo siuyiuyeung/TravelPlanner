@@ -555,12 +555,15 @@ export function BudgetTab({ tripId, userId, members, itineraryItems, budgetCents
           )}
         </div>
 
-        {/* Add expense button */}
+        {/* FAB */}
         <button
           onClick={() => setAddOpen(true)}
-          className="w-full py-3.5 border-2 border-dashed border-[#E5E0DA] rounded-[12px] text-[14px] font-semibold text-[#6B6560] hover:border-[#E8622A] hover:text-[#E8622A] transition-colors"
+          className="fixed bottom-24 right-5 w-10 h-10 bg-[#E8622A] rounded-full shadow-[0_4px_16px_rgba(232,98,42,0.40)] flex items-center justify-center text-white z-40"
+          aria-label="Add expense"
         >
-          + Add Expense
+          <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true">
+            <path d="M9 3v12M3 9h12" stroke="currentColor" strokeWidth="2.25" strokeLinecap="round" />
+          </svg>
         </button>
 
         {/* Who paid log */}

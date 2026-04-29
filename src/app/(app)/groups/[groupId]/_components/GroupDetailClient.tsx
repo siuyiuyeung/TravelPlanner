@@ -187,9 +187,8 @@ export function GroupDetailClient({ group: initialGroup }: Props) {
 
       {/* Trips */}
       <section>
-        <div className="flex items-center justify-between mb-3">
+        <div className="mb-3">
           <h2 className="text-[17px] font-bold text-[#1A1512]">Trips</h2>
-          <Link href={`/trips/new`} className="text-sm font-medium text-[#E8622A]">+ New</Link>
         </div>
         {group.trips.length === 0 ? (
           <p className="text-sm text-[#A09B96] py-4 text-center">No trips yet</p>
@@ -218,6 +217,16 @@ export function GroupDetailClient({ group: initialGroup }: Props) {
         )}
       </section>
 
+      {/* FAB */}
+      <Link
+        href="/trips/new"
+        className="fixed bottom-24 right-5 w-10 h-10 bg-[#E8622A] rounded-full shadow-[0_4px_16px_rgba(232,98,42,0.40)] flex items-center justify-center text-white z-40"
+        aria-label="New trip"
+      >
+        <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true">
+          <path d="M9 3v12M3 9h12" stroke="currentColor" strokeWidth="2.25" strokeLinecap="round" />
+        </svg>
+      </Link>
     </div>
   );
 }

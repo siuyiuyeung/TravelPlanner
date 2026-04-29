@@ -127,14 +127,8 @@ export function GroupsClient({ groups: initialGroups }: Props) {
 
   return (
     <div className="px-5 pt-14 pb-6">
-      <div className="mb-7 flex items-center justify-between">
+      <div className="mb-7">
         <h1 className="text-[26px] font-bold text-[#1A1512] tracking-tight">Groups</h1>
-        <Link
-          href="/groups/new"
-          className="px-4 py-2 bg-[#E8622A] text-white text-sm font-bold rounded-[12px] shadow-[0_2px_8px_rgba(232,98,42,0.30)]"
-        >
-          + New
-        </Link>
       </div>
 
       {groups.length === 0 ? (
@@ -184,6 +178,17 @@ export function GroupsClient({ groups: initialGroups }: Props) {
           </button>
         </div>
       </BottomSheet>
+
+      {/* FAB */}
+      <Link
+        href="/groups/new"
+        className="fixed bottom-24 right-5 w-10 h-10 bg-[#E8622A] rounded-full shadow-[0_4px_16px_rgba(232,98,42,0.40)] flex items-center justify-center text-white z-40"
+        aria-label="New group"
+      >
+        <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true">
+          <path d="M9 3v12M3 9h12" stroke="currentColor" strokeWidth="2.25" strokeLinecap="round" />
+        </svg>
+      </Link>
     </div>
   );
 }

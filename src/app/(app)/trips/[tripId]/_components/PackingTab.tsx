@@ -3,6 +3,7 @@
 import { useState, useRef } from "react";
 import { api } from "@/lib/trpc/client";
 import { useSwipeToDelete } from "@/hooks/use-swipe-to-delete";
+import { BottomSheet, BottomSheetTitle } from "@/components/ui/bottom-sheet";
 
 type Props = {
   tripId: string;
@@ -28,7 +29,7 @@ function categoryMeta(val: string) {
 
 // ─── Add Item Form ─────────────────────────────────────────────────────────────
 
-function AddItemRow({ tripId, onAdded }: { tripId: string; onAdded: () => void }) {
+function AddItemRow({ tripId, onAdded, onClose }: { tripId: string; onAdded: () => void; onClose?: () => void }) {
   const [name, setName] = useState("");
   const [qty, setQty] = useState("1");
   const [category, setCategory] = useState<CategoryValue>("general");
@@ -46,6 +47,7 @@ function AddItemRow({ tripId, onAdded }: { tripId: string; onAdded: () => void }
       setIsPersonal(false);
       setExpanded(false);
       onAdded();
+      onClose?.();
     },
   });
 
@@ -239,6 +241,7 @@ function PackingItemRow({
 export function PackingTab({ tripId, userId }: Props) {
   const { data: items = [], isLoading } = api.packing.listByTrip.useQuery({ tripId });
   const [filter, setFilter] = useState<"all" | "shared" | "mine">("all");
+  const [addOpen, setAddOpen] = useState(false);
 
   const filtered = items.filter((i) => {
     if (filter === "shared") return !i.isPersonal;
@@ -257,9 +260,6 @@ export function PackingTab({ tripId, userId }: Props) {
 
   return (
     <div className="space-y-4">
-      {/* Add form */}
-      <AddItemRow tripId={tripId} onAdded={() => {}} />
-
       {/* Progress + filter */}
       {items.length > 0 && (
         <div className="space-y-2.5">
@@ -314,7 +314,7 @@ export function PackingTab({ tripId, userId }: Props) {
         <div className="flex flex-col items-center py-10 text-center">
           <span className="text-4xl mb-3">🎒</span>
           <p className="text-[15px] font-semibold text-[#1A1512]">Nothing to pack yet</p>
-          <p className="text-sm text-[#6B6560] mt-1">Add items above to start your list</p>
+          <p className="text-sm text-[#6B6560] mt-1">Tap + to add your first item</p>
         </div>
       )}
 
@@ -331,6 +331,25 @@ export function PackingTab({ tripId, userId }: Props) {
           </div>
         </div>
       ))}
+
+      {/* FAB */}
+      <button
+        onClick={() => setAddOpen(true)}
+        className="fixed bottom-24 right-5 w-10 h-10 bg-[#E8622A] rounded-full shadow-[0_4px_16px_rgba(232,98,42,0.40)] flex items-center justify-center text-white z-40"
+        aria-label="Add packing item"
+      >
+        <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true">
+          <path d="M9 3v12M3 9h12" stroke="currentColor" strokeWidth="2.25" strokeLinecap="round" />
+        </svg>
+      </button>
+
+      {/* Add item sheet */}
+      <BottomSheet open={addOpen} onOpenChange={setAddOpen}>
+        <BottomSheetTitle>Add Packing Item</BottomSheetTitle>
+        <div className="px-5 pb-6">
+          <AddItemRow tripId={tripId} onAdded={() => {}} onClose={() => setAddOpen(false)} />
+        </div>
+      </BottomSheet>
     </div>
   );
 }
