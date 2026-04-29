@@ -594,8 +594,8 @@ export function ItineraryTimeline({ items, tripId, userId, legDistances, legDura
       {/* Day filter chips */}
       {dayChips.length > 1 && (
         <div
-          className="flex gap-2 overflow-x-auto pb-3 mb-4"
-          style={{ scrollbarWidth: "none", WebkitOverflowScrolling: "touch" } as React.CSSProperties}
+          className="sticky z-10 -mx-5 px-5 bg-gradient-to-b from-[#FAF8F5] to-transparent pt-2 pb-5 mb-0 flex gap-2 overflow-x-auto"
+          style={{ top: 'var(--tab-bar-height)', scrollbarWidth: "none", WebkitOverflowScrolling: "touch" } as React.CSSProperties}
         >
           <button
             onClick={() => setActiveDay(null)}

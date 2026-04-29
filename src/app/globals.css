@@ -46,6 +46,7 @@
 /* ─── shadcn/ui CSS variable overrides ──────────────────────────────────────── */
 
 :root {
+  --tab-bar-height: 42px;
   --background: 45 33% 98%;
   --foreground: 20 14% 10%;
   --card: 0 0% 100%;

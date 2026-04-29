@@ -431,10 +431,11 @@ export function TripDetailClient({ tripId, userId }: Props) {
 
       {/* Hero — collapses on Map tab */}
       <div className={`overflow-hidden transition-[max-height] duration-300 ease-in-out ${tab === 'map' ? 'max-h-0' : 'max-h-[400px]'}`}>
-        <div className={`relative bg-gradient-to-br ${gradient} px-5 pt-14 pb-5`}>
+        <div className={`relative bg-gradient-to-br ${gradient} px-5 pb-5`} style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 12px)' }}>
           <button
             onClick={() => router.back()}
-            className="absolute top-14 left-5 w-9 h-9 rounded-full bg-white/15 flex items-center justify-center text-white"
+            style={{ top: 'calc(env(safe-area-inset-top, 0px) + 12px)' }}
+            className="absolute left-5 w-9 h-9 rounded-full bg-white/15 flex items-center justify-center text-white"
           >
             ←
           </button>
@@ -650,7 +651,7 @@ export function TripDetailClient({ tripId, userId }: Props) {
             />
             {showMapFilter && (
               <div
-                style={{ position: "absolute", top: 56, left: 0, right: 0, zIndex: 10, pointerEvents: "none" } as React.CSSProperties}
+                style={{ position: "absolute", top: 'calc(var(--tab-bar-height) + 8px)', left: 0, right: 0, zIndex: 10, pointerEvents: "none" } as React.CSSProperties}
                 className="flex gap-2 px-4 overflow-x-auto"
               >
                 {mapChips.map(chip => (
