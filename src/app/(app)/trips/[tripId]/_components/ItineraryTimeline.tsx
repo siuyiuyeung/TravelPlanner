@@ -286,7 +286,7 @@ function ItemCard({
             >
               <span>{ITEM_EMOJI[item.type] ?? "📌"}</span>
             </div>
-            <div className="absolute -top-1.5 -right-1.5 w-[14px] h-[14px] rounded-full bg-[#1A1512] text-white text-[8px] font-bold font-mono flex items-center justify-center border border-[#FAF8F5] leading-none z-20">
+            <div className="absolute -top-1.5 -right-1.5 w-[14px] h-[14px] rounded-full bg-[#1A1512] text-white text-[8px] font-bold font-mono flex items-center justify-center border border-[#FAF8F5] leading-none">
               {seqNum}
             </div>
           </div>
@@ -594,7 +594,7 @@ export function ItineraryTimeline({ items, tripId, userId, legDistances, legDura
       {/* Day filter chips */}
       {dayChips.length > 1 && (
         <div
-          className="sticky z-10 -mx-5 px-5 bg-gradient-to-b from-[#FAF8F5] to-transparent pt-2 pb-5 mb-0 flex gap-2 overflow-x-auto"
+          className="sticky z-20 -mx-5 px-5 bg-gradient-to-b from-[#FAF8F5] to-transparent pt-2 pb-5 mb-0 flex gap-2 overflow-x-auto"
           style={{ top: 'var(--tab-bar-height)', scrollbarWidth: "none", WebkitOverflowScrolling: "touch" } as React.CSSProperties}
         >
           <button
