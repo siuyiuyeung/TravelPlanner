@@ -12,6 +12,13 @@ type MapItem = {
   startTime: Date | string | null;
 };
 
+type AddToPlanPayload = {
+  title: string;
+  locationName: string;
+  locationLat: string;
+  locationLng: string;
+};
+
 type Props = {
   items: MapItem[];
   onSelectItem: (id: string) => void;
@@ -19,6 +26,7 @@ type Props = {
   totalKm?: number | undefined;
   legDistances?: Record<string, number> | undefined;
   legDurations?: Record<string, number> | undefined;
+  onAddToPlan: (payload: AddToPlanPayload) => void;
 };
 
 const MapViewInner = dynamic(
@@ -42,12 +50,12 @@ const MapViewInner = dynamic(
   }
 );
 
-export function MapView({ items, onSelectItem, routeSegments, totalKm, legDistances, legDurations }: Props) {
+export function MapView({ items, onSelectItem, routeSegments, totalKm, legDistances, legDurations, onAddToPlan }: Props) {
   return (
     // flex-1 grows to fill the tab content area; position:relative + absolute child gives Leaflet real px dimensions
     <div style={{ flex: 1, position: "relative", minHeight: 0, zIndex: 0 }}>
       <div style={{ position: "absolute", inset: 0 }}>
-        <MapViewInner items={items} onSelectItem={onSelectItem} routeSegments={routeSegments} totalKm={totalKm} legDistances={legDistances} legDurations={legDurations} />
+        <MapViewInner items={items} onSelectItem={onSelectItem} routeSegments={routeSegments} totalKm={totalKm} legDistances={legDistances} legDurations={legDurations} onAddToPlan={onAddToPlan} />
       </div>
     </div>
   );

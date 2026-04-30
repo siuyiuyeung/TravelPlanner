@@ -153,6 +153,7 @@ export function TripDetailClient({ tripId, userId }: Props) {
   const [tab, setTab] = useState<"overview" | "itinerary" | "map" | "budget" | "pack" | "chat">("overview");
   const [showMapOverlay, setShowMapOverlay] = useState(false);
   const [addItemOpen, setAddItemOpen] = useState(false);
+  const [addItemPrefill, setAddItemPrefill] = useState<{ title: string; locationName: string; locationLat: string; locationLng: string } | null>(null);
   const [mapSelectedId, setMapSelectedId] = useState<string | null>(null);
   const [mapDay, setMapDay] = useState<string | null>(null);
   const [routeData, setRouteData] = useState<RouteData | null>(null);
@@ -388,8 +389,14 @@ export function TripDetailClient({ tripId, userId }: Props) {
 
   const { pulling, refreshing } = usePullToRefresh(handleRefresh);
 
+  const handleAddToPlan = useCallback((payload: { title: string; locationName: string; locationLat: string; locationLng: string }) => {
+    setAddItemPrefill(payload);
+    setAddItemOpen(true);
+  }, []);
+
   function onItemAdded() {
     setAddItemOpen(false);
+    setAddItemPrefill(null);
   }
 
   if (isLoading || !trip) {
@@ -648,6 +655,7 @@ export function TripDetailClient({ tripId, userId }: Props) {
               totalKm={totalKm || routeData?.totalKm}
               legDistances={legDistances}
               legDurations={legDurations}
+              onAddToPlan={handleAddToPlan}
             />
             {showMapFilter && (
               <div
@@ -730,9 +738,20 @@ export function TripDetailClient({ tripId, userId }: Props) {
       )}
 
       {/* Add item sheet */}
-      <BottomSheet open={addItemOpen} onOpenChange={setAddItemOpen}>
+      <BottomSheet
+        open={addItemOpen}
+        onOpenChange={(open) => {
+          setAddItemOpen(open);
+          if (!open) setAddItemPrefill(null);
+        }}
+      >
         <BottomSheetTitle>Add to Itinerary</BottomSheetTitle>
-        <AddItemForm tripId={trip.id} onSuccess={onItemAdded} />
+        <AddItemForm
+          key={addItemPrefill ? `${addItemPrefill.locationLat}-${addItemPrefill.locationLng}` : "manual"}
+          tripId={trip.id}
+          onSuccess={onItemAdded}
+          {...(addItemPrefill ? { initialValues: addItemPrefill } : {})}
+        />
       </BottomSheet>
     </div>
   );

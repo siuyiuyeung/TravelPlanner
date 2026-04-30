@@ -11,6 +11,7 @@ import Map, {
 } from "react-map-gl/mapbox";
 import type { GeoJSON } from "geojson";
 import "mapbox-gl/dist/mapbox-gl.css";
+import { MapSearchBar, type SearchResult } from "./MapSearchBar";
 
 type PoiFeature = {
   type: "Feature";
@@ -35,6 +36,13 @@ type MapItem = {
   startTime: Date | string | null;
 };
 
+export type AddToPlanPayload = {
+  title: string;
+  locationName: string;
+  locationLat: string;
+  locationLng: string;
+};
+
 type Props = {
   items: MapItem[];
   onSelectItem: (id: string) => void;
@@ -42,6 +50,7 @@ type Props = {
   totalKm?: number | undefined;
   legDistances?: Record<string, number> | undefined;
   legDurations?: Record<string, number> | undefined;
+  onAddToPlan: (payload: AddToPlanPayload) => void;
 };
 
 const MAPBOX_TOKEN = process.env.NEXT_PUBLIC_MAPBOX_TOKEN ?? "";
@@ -70,12 +79,18 @@ const STYLE_LABELS: Record<StyleKey, string> = {
 };
 
 const POI_CATEGORIES = [
-  { id: "gas_station",   label: "Gas Station",   icon: "⛽", keyword: "fuel" },
-  { id: "transit",       label: "Transit",        icon: "🚉", keyword: "public_transportation_station" },
-  { id: "attraction",    label: "Attraction",     icon: "🎡", keyword: "tourist_attraction" },
-  { id: "restaurant",    label: "Restaurant",     icon: "🍜", keyword: "restaurant" },
-  { id: "supermarket",   label: "Supermarket",    icon: "🛒", keyword: "supermarket" },
-  { id: "accommodation", label: "Accommodation",  icon: "🏨", keyword: "hotel" },
+  { id: "gas_station",        label: "Gas Station",   icon: "⛽", keyword: "fuel" },
+  { id: "transit",            label: "Transit",        icon: "🚉", keyword: "public_transportation_station" },
+  { id: "attraction",         label: "Attraction",     icon: "🎡", keyword: "tourist_attraction" },
+  { id: "restaurant",         label: "Restaurant",     icon: "🍜", keyword: "restaurant" },
+  { id: "supermarket",        label: "Supermarket",    icon: "🛒", keyword: "supermarket" },
+  { id: "accommodation",      label: "Hotel",          icon: "🏨", keyword: "hotel" },
+  { id: "pharmacy",           label: "Pharmacy",       icon: "💊", keyword: "pharmacy" },
+  { id: "atm",                label: "ATM",            icon: "🏧", keyword: "atm" },
+  { id: "cafe",               label: "Cafe",           icon: "☕", keyword: "cafe" },
+  { id: "convenience_store",  label: "Convenience",    icon: "🏪", keyword: "convenience_store" },
+  { id: "parking",            label: "Parking",        icon: "🅿️", keyword: "parking_lot" },
+  { id: "embassy",            label: "Embassy",        icon: "🏛️", keyword: "embassy" },
 ] as const;
 
 const ITEM_EMOJI: Record<string, string> = {
@@ -362,7 +377,7 @@ function TerrainSetter() {
   return null;
 }
 
-export function MapViewInner({ items, onSelectItem, routeSegments, totalKm, legDistances, legDurations }: Props) {
+export function MapViewInner({ items, onSelectItem, routeSegments, totalKm, legDistances, legDurations, onAddToPlan }: Props) {
   const mapRef = useRef<MapRef>(null);
   const fitted = useRef(false);
   const [styleKey, setStyleKey] = useState<StyleKey>("streets");
@@ -375,6 +390,8 @@ export function MapViewInner({ items, onSelectItem, routeSegments, totalKm, legD
   const [poiResults, setPoiResults] = useState<PoiFeature[]>([]);
   const [poiLoading, setPoiLoading] = useState(false);
   const [selectedPoi, setSelectedPoi] = useState<PoiFeature | null>(null);
+  const [searchResult, setSearchResult] = useState<SearchResult | null>(null);
+  const [selectedSearchPin, setSelectedSearchPin] = useState(false);
 
   const pinned = items.filter((i) => i.locationLat !== null && i.locationLng !== null);
   const positions = pinned.map((i) => ({
@@ -469,6 +486,21 @@ export function MapViewInner({ items, onSelectItem, routeSegments, totalKm, legD
 
   return (
     <div style={{ position: "relative", width: "100%", height: "100%" }}>
+      {/* Search bar */}
+      <MapSearchBar
+        onSelect={(result) => {
+          setSearchResult(result);
+          setSelectedSearchPin(true);
+          setSelectedItemId(null);
+          setSelectedPoi(null);
+          mapRef.current?.flyTo({ center: [result.lng, result.lat], zoom: 15, animate: true });
+        }}
+        onClear={() => {
+          setSearchResult(null);
+          setSelectedSearchPin(false);
+        }}
+      />
+
       {/* Empty state */}
       {pinned.length === 0 && (
         <div style={{ position: "absolute", inset: 0, zIndex: 10, display: "flex", alignItems: "center", justifyContent: "center", pointerEvents: "none" }}>
@@ -514,23 +546,26 @@ export function MapViewInner({ items, onSelectItem, routeSegments, totalKm, legD
             position: "absolute", bottom: 0, right: 48,
             background: "rgba(255,255,255,0.97)", backdropFilter: "blur(8px)",
             borderRadius: 14, boxShadow: "0 4px 20px rgba(0,0,0,0.18)",
-            padding: "6px 0", minWidth: 164,
+            padding: 8, width: "fit-content", minWidth: 130, maxHeight: 200, overflowY: "auto",
             border: "1px solid rgba(229,224,218,0.6)",
+            display: "flex", flexDirection: "column", gap: 2,
           }}>
             {POI_CATEGORIES.map((cat) => (
               <button
                 key={cat.id}
                 onClick={() => handlePoiCategorySelect(cat.id)}
                 style={{
-                  display: "flex", alignItems: "center", gap: 10, width: "100%",
-                  padding: "10px 16px", background: activePoiCategory === cat.id ? "#EFF6FF" : "transparent",
-                  border: "none", cursor: "pointer", fontSize: 13,
+                  display: "flex", alignItems: "center", gap: 6,
+                  padding: "8px 10px", borderRadius: 8,
+                  background: activePoiCategory === cat.id ? "#EFF6FF" : "transparent",
+                  border: activePoiCategory === cat.id ? "1.5px solid #1D4ED8" : "1.5px solid transparent",
+                  cursor: "pointer", fontSize: 12,
                   color: activePoiCategory === cat.id ? "#1D4ED8" : "#374151",
                   fontWeight: activePoiCategory === cat.id ? 600 : 400,
-                  borderLeft: activePoiCategory === cat.id ? "3px solid #1D4ED8" : "3px solid transparent",
+                  textAlign: "left",
                 }}
               >
-                <span style={{ fontSize: 16 }}>{cat.icon}</span>
+                <span style={{ fontSize: 15, flexShrink: 0 }}>{cat.icon}</span>
                 <span>{cat.label}</span>
               </button>
             ))}
@@ -712,7 +747,7 @@ export function MapViewInner({ items, onSelectItem, routeSegments, totalKm, legD
               longitude={pos.lng}
               latitude={pos.lat}
               anchor="bottom"
-              onClick={() => { setSelectedPoi(null); setSelectedItemId(item.id); }}
+              onClick={() => { setSelectedPoi(null); setSelectedSearchPin(false); setSelectedItemId(item.id); }}
             >
               <MarkerPin emoji={emoji} seq={idx + 1} />
             </Marker>
@@ -783,6 +818,7 @@ export function MapViewInner({ items, onSelectItem, routeSegments, totalKm, legD
               onClick={(e) => {
                 e.originalEvent.stopPropagation();
                 setSelectedItemId(null);
+                setSelectedSearchPin(false);
                 setSelectedPoi(poi);
               }}
             >
@@ -827,14 +863,111 @@ export function MapViewInner({ items, onSelectItem, routeSegments, totalKm, legD
                   {selectedPoi.properties.full_address ?? selectedPoi.properties.place_formatted}
                 </p>
               )}
-              <a
-                href={`https://www.google.com/maps/dir/?api=1&destination=${selectedPoi.geometry.coordinates[1]},${selectedPoi.geometry.coordinates[0]}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                style={{ display: "block", textAlign: "center", padding: "6px 12px", background: "#1A73E8", color: "white", borderRadius: 8, fontSize: 12, fontWeight: 600, textDecoration: "none" }}
-              >
-                Directions ↗
-              </a>
+              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                <a
+                  href={`https://www.google.com/maps/dir/?api=1&destination=${selectedPoi.geometry.coordinates[1]},${selectedPoi.geometry.coordinates[0]}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{ display: "block", textAlign: "center", padding: "6px 12px", background: "#1A73E8", color: "white", borderRadius: 8, fontSize: 12, fontWeight: 600, textDecoration: "none" }}
+                >
+                  Directions ↗
+                </a>
+                <button
+                  onClick={() => {
+                    setSelectedPoi(null);
+                    onAddToPlan({
+                      title: selectedPoi.properties.name,
+                      locationName: selectedPoi.properties.full_address ?? selectedPoi.properties.place_formatted ?? selectedPoi.properties.name,
+                      locationLat: String(selectedPoi.geometry.coordinates[1]),
+                      locationLng: String(selectedPoi.geometry.coordinates[0]),
+                    });
+                  }}
+                  style={{ display: "block", width: "100%", padding: "6px 12px", background: "#E8622A", color: "white", borderRadius: 8, fontSize: 12, fontWeight: 600, border: "none", cursor: "pointer" }}
+                >
+                  + Add to Plan
+                </button>
+              </div>
+            </div>
+          </Popup>
+        )}
+
+        {/* Search result pin */}
+        {searchResult && (
+          <Marker
+            longitude={searchResult.lng}
+            latitude={searchResult.lat}
+            anchor="bottom"
+            onClick={(e) => {
+              e.originalEvent.stopPropagation();
+              setSelectedItemId(null);
+              setSelectedPoi(null);
+              setSelectedSearchPin(true);
+            }}
+          >
+            <div style={{
+              width: 32, height: 32, borderRadius: "50%",
+              background: "#6366F1",
+              border: "2.5px solid white",
+              display: "flex", alignItems: "center", justifyContent: "center",
+              fontSize: 15, cursor: "pointer",
+              boxShadow: "0 2px 8px rgba(99,102,241,0.45)",
+            }}>
+              🔍
+            </div>
+          </Marker>
+        )}
+
+        {/* Search result popup */}
+        {searchResult && selectedSearchPin && (
+          <Popup
+            longitude={searchResult.lng}
+            latitude={searchResult.lat}
+            anchor="bottom"
+            offset={20}
+            onClose={() => setSelectedSearchPin(false)}
+            closeButton={false}
+            closeOnClick={false}
+            maxWidth="220px"
+          >
+            <div style={{ minWidth: 190, padding: "12px 14px 12px" }}>
+              <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 8, marginBottom: 4 }}>
+                <p style={{ fontWeight: 700, fontSize: 14, margin: 0, flex: 1 }}>
+                  {searchResult.placeName.split(",")[0]}
+                </p>
+                <button
+                  onClick={() => setSelectedSearchPin(false)}
+                  style={{ flexShrink: 0, width: 22, height: 22, borderRadius: "50%", background: "#F0EDE8", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, color: "#6B6560", lineHeight: 1 }}
+                >
+                  ×
+                </button>
+              </div>
+              <p style={{ fontSize: 12, color: "#6B6560", margin: "0 0 10px" }}>
+                {searchResult.placeName}
+              </p>
+              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                <a
+                  href={`https://www.google.com/maps/dir/?api=1&destination=${searchResult.lat},${searchResult.lng}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{ display: "block", textAlign: "center", padding: "6px 12px", background: "#1A73E8", color: "white", borderRadius: 8, fontSize: 12, fontWeight: 600, textDecoration: "none" }}
+                >
+                  Directions ↗
+                </a>
+                <button
+                  onClick={() => {
+                    setSelectedSearchPin(false);
+                    onAddToPlan({
+                      title: searchResult.placeName.split(",")[0] ?? searchResult.placeName,
+                      locationName: searchResult.placeName,
+                      locationLat: String(searchResult.lat),
+                      locationLng: String(searchResult.lng),
+                    });
+                  }}
+                  style={{ display: "block", width: "100%", padding: "6px 12px", background: "#E8622A", color: "white", borderRadius: 8, fontSize: 12, fontWeight: 600, border: "none", cursor: "pointer" }}
+                >
+                  + Add to Plan
+                </button>
+              </div>
             </div>
           </Popup>
         )}

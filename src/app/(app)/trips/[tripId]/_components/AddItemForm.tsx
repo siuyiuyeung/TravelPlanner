@@ -4,9 +4,17 @@ import { useState } from "react";
 import { api } from "@/lib/trpc/client";
 import { LocationAutocomplete } from "./LocationAutocomplete";
 
+type InitialValues = {
+  title?: string;
+  locationName?: string;
+  locationLat?: string;
+  locationLng?: string;
+};
+
 type Props = {
   tripId: string;
   onSuccess: () => void;
+  initialValues?: InitialValues;
 };
 
 const ITEM_TYPES = [
@@ -20,14 +28,14 @@ const ITEM_TYPES = [
 
 type ItemType = (typeof ITEM_TYPES)[number]["value"];
 
-export function AddItemForm({ tripId, onSuccess }: Props) {
+export function AddItemForm({ tripId, onSuccess, initialValues }: Props) {
   const [type, setType] = useState<ItemType>("activity");
-  const [title, setTitle] = useState("");
+  const [title, setTitle] = useState(initialValues?.title ?? "");
   const [date, setDate] = useState("");
   const [time, setTime] = useState("");
-  const [location, setLocation] = useState("");
-  const [locationLat, setLocationLat] = useState<string | undefined>();
-  const [locationLng, setLocationLng] = useState<string | undefined>();
+  const [location, setLocation] = useState(initialValues?.locationName ?? "");
+  const [locationLat, setLocationLat] = useState<string | undefined>(initialValues?.locationLat);
+  const [locationLng, setLocationLng] = useState<string | undefined>(initialValues?.locationLng);
   const [description, setDescription] = useState("");
   const [error, setError] = useState("");
 
