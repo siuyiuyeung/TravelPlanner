@@ -863,15 +863,7 @@ export function MapViewInner({ items, onSelectItem, routeSegments, totalKm, legD
                   {selectedPoi.properties.full_address ?? selectedPoi.properties.place_formatted}
                 </p>
               )}
-              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                <a
-                  href={`https://www.google.com/maps/dir/?api=1&destination=${selectedPoi.geometry.coordinates[1]},${selectedPoi.geometry.coordinates[0]}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  style={{ display: "block", textAlign: "center", padding: "6px 12px", background: "#1A73E8", color: "white", borderRadius: 8, fontSize: 12, fontWeight: 600, textDecoration: "none" }}
-                >
-                  Directions ↗
-                </a>
+              <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
                 <button
                   onClick={() => {
                     setSelectedPoi(null);
@@ -882,10 +874,18 @@ export function MapViewInner({ items, onSelectItem, routeSegments, totalKm, legD
                       locationLng: String(selectedPoi.geometry.coordinates[0]),
                     });
                   }}
-                  style={{ display: "block", width: "100%", padding: "6px 12px", background: "#E8622A", color: "white", borderRadius: 8, fontSize: 12, fontWeight: 600, border: "none", cursor: "pointer" }}
+                  style={{ flex: 1, padding: "6px 0", background: "#E8622A", color: "white", borderRadius: 8, fontSize: 12, fontWeight: 600, border: "none", cursor: "pointer" }}
                 >
                   + Add to Plan
                 </button>
+                <a
+                  href={`https://maps.google.com?q=${selectedPoi.geometry.coordinates[1]},${selectedPoi.geometry.coordinates[0]}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{ flex: 1, padding: "6px 0", borderRadius: 8, background: "#F0EDE8", color: "#2D6A8F", fontSize: 12, fontWeight: 600, textAlign: "center", textDecoration: "none", display: "block" }}
+                >
+                  Maps ↗
+                </a>
               </div>
             </div>
           </Popup>
@@ -944,15 +944,7 @@ export function MapViewInner({ items, onSelectItem, routeSegments, totalKm, legD
               <p style={{ fontSize: 12, color: "#6B6560", margin: "0 0 10px" }}>
                 {searchResult.placeName}
               </p>
-              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                <a
-                  href={`https://www.google.com/maps/dir/?api=1&destination=${searchResult.lat},${searchResult.lng}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  style={{ display: "block", textAlign: "center", padding: "6px 12px", background: "#1A73E8", color: "white", borderRadius: 8, fontSize: 12, fontWeight: 600, textDecoration: "none" }}
-                >
-                  Directions ↗
-                </a>
+              <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
                 <button
                   onClick={() => {
                     setSelectedSearchPin(false);
@@ -963,10 +955,18 @@ export function MapViewInner({ items, onSelectItem, routeSegments, totalKm, legD
                       locationLng: String(searchResult.lng),
                     });
                   }}
-                  style={{ display: "block", width: "100%", padding: "6px 12px", background: "#E8622A", color: "white", borderRadius: 8, fontSize: 12, fontWeight: 600, border: "none", cursor: "pointer" }}
+                  style={{ flex: 1, padding: "6px 0", background: "#E8622A", color: "white", borderRadius: 8, fontSize: 12, fontWeight: 600, border: "none", cursor: "pointer" }}
                 >
                   + Add to Plan
                 </button>
+                <a
+                  href={`https://maps.google.com?q=${searchResult.lat},${searchResult.lng}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{ flex: 1, padding: "6px 0", borderRadius: 8, background: "#F0EDE8", color: "#2D6A8F", fontSize: 12, fontWeight: 600, textAlign: "center", textDecoration: "none", display: "block" }}
+                >
+                  Maps ↗
+                </a>
               </div>
             </div>
           </Popup>
