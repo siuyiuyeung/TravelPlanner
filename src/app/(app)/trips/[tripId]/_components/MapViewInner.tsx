@@ -71,7 +71,7 @@ const STYLE_LABELS: Record<StyleKey, string> = {
 
 const POI_CATEGORIES = [
   { id: "gas_station",   label: "Gas Station",   icon: "⛽", keyword: "fuel" },
-  { id: "toilet",        label: "Toilet",         icon: "🚻", keyword: "toilet" },
+  { id: "transit",       label: "Transit",        icon: "🚉", keyword: "public_transportation_station" },
   { id: "attraction",    label: "Attraction",     icon: "🎡", keyword: "tourist_attraction" },
   { id: "restaurant",    label: "Restaurant",     icon: "🍜", keyword: "restaurant" },
   { id: "supermarket",   label: "Supermarket",    icon: "🛒", keyword: "supermarket" },
