@@ -400,6 +400,7 @@ export function MapViewInner({ items, onSelectItem, routeSegments, totalKm, legD
   }));
 
   const defaultCenter = positions[0] ?? { lng: 114.1694, lat: 22.3193 };
+  const [mapCenter, setMapCenter] = useState<{ lng: number; lat: number }>(defaultCenter);
   const selectedIdx = pinned.findIndex((i) => i.id === selectedItemId);
   const selectedItem = selectedIdx >= 0 ? pinned[selectedIdx] : null;
   const selectedPos = selectedIdx >= 0 ? positions[selectedIdx] : null;
@@ -488,6 +489,7 @@ export function MapViewInner({ items, onSelectItem, routeSegments, totalKm, legD
     <div style={{ position: "relative", width: "100%", height: "100%" }}>
       {/* Search bar */}
       <MapSearchBar
+        proximity={mapCenter}
         onSelect={(result) => {
           setSearchResult(result);
           setSelectedSearchPin(true);
@@ -675,6 +677,10 @@ export function MapViewInner({ items, onSelectItem, routeSegments, totalKm, legD
         dragRotate={true}
         style={{ width: "100%", height: "100%" }}
         onLoad={handleLoad}
+        onMoveEnd={() => {
+          const c = mapRef.current?.getMap().getCenter();
+          if (c) setMapCenter({ lng: c.lng, lat: c.lat });
+        }}
       >
         <TerrainSetter />
 

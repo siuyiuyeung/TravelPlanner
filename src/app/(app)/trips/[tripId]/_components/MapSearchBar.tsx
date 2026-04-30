@@ -11,11 +11,12 @@ export type SearchResult = {
 type Props = {
   onSelect: (result: SearchResult) => void;
   onClear: () => void;
+  proximity?: { lng: number; lat: number };
 };
 
 const MAPBOX_TOKEN = process.env.NEXT_PUBLIC_MAPBOX_TOKEN ?? "";
 
-export function MapSearchBar({ onSelect, onClear }: Props) {
+export function MapSearchBar({ onSelect, onClear, proximity }: Props) {
   const [searchExpanded, setSearchExpanded] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [suggestions, setSuggestions] = useState<SearchResult[]>([]);
@@ -49,8 +50,11 @@ export function MapSearchBar({ onSelect, onClear }: Props) {
       return;
     }
     try {
+      const proximityParam = proximity
+        ? `&proximity=${proximity.lng.toFixed(4)},${proximity.lat.toFixed(4)}`
+        : "";
       const res = await fetch(
-        `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(query)}.json?limit=5&access_token=${MAPBOX_TOKEN}`
+        `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(query)}.json?limit=5${proximityParam}&access_token=${MAPBOX_TOKEN}`
       );
       const data = (await res.json()) as {
         features: { place_name: string; center: [number, number] }[];
@@ -142,11 +146,13 @@ export function MapSearchBar({ onSelect, onClear }: Props) {
                 borderRadius: 12, boxShadow: "0 4px 20px rgba(0,0,0,0.18)",
                 border: "1px solid rgba(229,224,218,0.6)",
                 listStyle: "none", margin: 0, padding: 4, zIndex: 9999,
+                maxHeight: 220, overflowY: "auto", WebkitOverflowScrolling: "touch",
               }}>
                 {suggestions.map((s, i) => (
                   <li key={i}>
                     <button
-                      onPointerDown={(e) => { e.preventDefault(); handleSelect(s); }}
+                      onPointerDown={(e) => e.preventDefault()}
+                      onClick={() => handleSelect(s)}
                       style={{
                         width: "100%", textAlign: "left", padding: "9px 12px",
                         background: "transparent", border: "none", cursor: "pointer",
