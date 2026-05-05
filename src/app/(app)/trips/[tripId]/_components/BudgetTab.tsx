@@ -139,7 +139,6 @@ function ExpenseForm(props: ExpenseFormProps) {
           placeholder="e.g. Dinner at Nobu"
           className="w-full px-3.5 py-3 bg-[#F0EDE8] rounded-[10px] text-[15px] text-[#1A1512] placeholder:text-[#A09B96] outline-none"
           required
-          autoFocus={props.mode === "edit"}
         />
       </div>
 
