@@ -373,6 +373,10 @@ broadcastTripUpdate(input.tripId)
 - The PWA manifest must include `display: "standalone"` and iOS-specific meta tags
 - Test "Add to Home Screen" on actual iPhone Safari before considering PWA done
 
+### Mobile Scroll Gotchas
+- Use `el.scrollTop = 0` not `scrollTo({ behavior: 'smooth' })` for programmatic scroll — concurrent smooth animations break `position: sticky` on iOS Safari
+- When using `setTimeout` inside event handlers that can fire repeatedly (e.g. tab switching), always track the timer in a `useRef` and `clearTimeout` before scheduling a new one — stale callbacks silently corrupt UI state
+
 ---
 
 ## Docker / Deployment Notes
