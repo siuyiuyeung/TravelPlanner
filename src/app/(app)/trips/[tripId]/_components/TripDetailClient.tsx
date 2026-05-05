@@ -154,6 +154,7 @@ export function TripDetailClient({ tripId, userId }: Props) {
   const [showMapOverlay, setShowMapOverlay] = useState(false);
   const [addItemOpen, setAddItemOpen] = useState(false);
   const [addItemPrefill, setAddItemPrefill] = useState<{ title: string; locationName: string; locationLat: string; locationLng: string } | null>(null);
+  const mapOverlayTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [mapSelectedId, setMapSelectedId] = useState<string | null>(null);
   const [mapDay, setMapDay] = useState<string | null>(null);
   const [routeData, setRouteData] = useState<RouteData | null>(null);
@@ -164,13 +165,21 @@ export function TripDetailClient({ tripId, userId }: Props) {
   const utils = api.useUtils();
 
   const switchTab = useCallback((id: typeof tab) => {
+    if (mapOverlayTimerRef.current !== null) {
+      clearTimeout(mapOverlayTimerRef.current);
+      mapOverlayTimerRef.current = null;
+    }
     setTab(id);
     window.dispatchEvent(new CustomEvent('tab-change', { detail: { tab: id } }));
     if (id === 'map') {
-      setTimeout(() => setShowMapOverlay(true), 300);
+      mapOverlayTimerRef.current = setTimeout(() => {
+        mapOverlayTimerRef.current = null;
+        setShowMapOverlay(true);
+      }, 300);
     } else {
       setShowMapOverlay(false);
-      document.getElementById('main-scroll')?.scrollTo({ top: 0, behavior: 'smooth' });
+      const el = document.getElementById('main-scroll');
+      if (el) el.scrollTop = 0;
     }
   }, []);
 
