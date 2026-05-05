@@ -9,7 +9,7 @@ export function formatCurrency(cents: number, currency = "HKD"): string {
   return new Intl.NumberFormat("en-US", {
     style: "currency",
     currency,
-    minimumFractionDigits: currency === "JPY" || currency === "CNY" ? 0 : 2,
+    minimumFractionDigits: ["JPY", "CNY", "KRW", "IDR", "VND", "TWD"].includes(currency) ? 0 : 2,
   }).format(cents / 100);
 }
 
