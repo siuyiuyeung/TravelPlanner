@@ -165,6 +165,7 @@ export function TripDetailClient({ tripId, userId }: Props) {
 
   const switchTab = useCallback((id: typeof tab) => {
     setTab(id);
+    window.dispatchEvent(new CustomEvent('tab-change', { detail: { tab: id } }));
     if (id === 'map') {
       setTimeout(() => setShowMapOverlay(true), 300);
     } else {

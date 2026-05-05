@@ -8,6 +8,7 @@ const NEAR_BOTTOM_THRESHOLD = 100
 export function ScrollButtons() {
   const [showTop, setShowTop] = useState(false)
   const [showBottom, setShowBottom] = useState(false)
+  const [suppressed, setSuppressed] = useState(false)
 
   const update = useCallback((el: HTMLElement) => {
     const scrolled = el.scrollTop
@@ -25,13 +26,21 @@ export function ScrollButtons() {
     return () => el.removeEventListener('scroll', handler)
   }, [update])
 
+  useEffect(() => {
+    const handler = (e: Event) => {
+      setSuppressed((e as CustomEvent<{ tab: string }>).detail.tab === 'map')
+    }
+    window.addEventListener('tab-change', handler)
+    return () => window.removeEventListener('tab-change', handler)
+  }, [])
+
   const scrollTo = (pos: 'top' | 'bottom') => {
     const el = document.getElementById('main-scroll')
     if (!el) return
     el.scrollTo({ top: pos === 'top' ? 0 : el.scrollHeight, behavior: 'smooth' })
   }
 
-  if (!showTop && !showBottom) return null
+  if (suppressed || (!showTop && !showBottom)) return null
 
   return (
     <div className="fixed bottom-24 left-1/2 -translate-x-1/2 flex gap-2 z-40">
