@@ -1,4 +1,4 @@
-const CACHE_NAME = 'tripsync-shell-v1';
+const CACHE_NAME = 'tripsync-shell-v2';
 
 // App shell assets to cache on install
 const SHELL_URLS = [
@@ -34,6 +34,12 @@ self.addEventListener('activate', (event) => {
 self.addEventListener('fetch', (event) => {
   const { request } = event;
   const url = new URL(request.url);
+
+  // Let the browser handle all cross-origin requests natively
+  // (mapbox tiles, directions, events, sessions, geocoding, etc.)
+  if (url.origin !== self.location.origin) {
+    return;
+  }
 
   // Always go network-only for API calls, auth, and SSE
   if (
