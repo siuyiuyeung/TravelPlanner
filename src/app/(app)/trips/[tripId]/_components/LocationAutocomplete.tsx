@@ -16,13 +16,15 @@ type Suggestion = {
 
 type Props = {
   value: string;
+  lat?: string | undefined;
+  lng?: string | undefined;
   onChange: (value: string, lat?: string, lng?: string) => void;
   placeholder?: string;
 };
 
 const TOKEN = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
 
-export function LocationAutocomplete({ value, onChange, placeholder = "Search for a place…" }: Props) {
+export function LocationAutocomplete({ value, lat, lng, onChange, placeholder = "Search for a place…" }: Props) {
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
   const [open, setOpen] = useState(false);
   const [activeIdx, setActiveIdx] = useState(-1);
@@ -31,8 +33,8 @@ export function LocationAutocomplete({ value, onChange, placeholder = "Search fo
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const committed = useRef(false); // true after user picks a suggestion
-  const latRef = useRef<string | undefined>(undefined);
-  const lngRef = useRef<string | undefined>(undefined);
+  const latRef = useRef<string | undefined>(lat);
+  const lngRef = useRef<string | undefined>(lng);
 
   const fetchSuggestions = useCallback(async (query: string) => {
     if (!query.trim() || query.length < 2) {

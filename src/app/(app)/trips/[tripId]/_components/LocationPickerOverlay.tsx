@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback } from "react";
-import Map, { type MapRef } from "react-map-gl/mapbox";
+import Map, { type MapRef, Marker } from "react-map-gl/mapbox";
 import "mapbox-gl/dist/mapbox-gl.css";
 
 const TOKEN = process.env.NEXT_PUBLIC_MAPBOX_TOKEN ?? "";
@@ -20,20 +20,9 @@ type Props = {
   onClose: () => void;
 };
 
-function CrosshairPin({ locked }: { locked: boolean }) {
+function PinMarker() {
   return (
-    <div
-      style={{
-        position: "fixed",
-        top: "50%",
-        left: "50%",
-        transform: "translate(-50%, -100%)",
-        pointerEvents: "none",
-        zIndex: 10,
-        transition: "transform 0.15s ease",
-        ...(locked ? { transform: "translate(-50%, -100%) scale(0.92)" } : {}),
-      }}
-    >
+    <div style={{ pointerEvents: "none" }}>
       <svg width="32" height="44" viewBox="0 0 32 44" fill="none" xmlns="http://www.w3.org/2000/svg">
         <circle cx="16" cy="15" r="13" fill="#E8622A" stroke="white" strokeWidth="2.5" />
         <circle cx="16" cy="15" r="5" fill="white" />
@@ -52,31 +41,24 @@ export function LocationPickerOverlay({ initialLat, initialLng, initialName = ""
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [placeName, setPlaceName] = useState(initialName);
   const [isGeocoding, setIsGeocoding] = useState(false);
-  const [pinLocked, setPinLocked] = useState(false);
+  const [pinPosition, setPinPosition] = useState<{ lat: number; lng: number } | null>(
+    hasInitial ? { lat: initialLat!, lng: initialLng! } : null,
+  );
   const [mapCenter, setMapCenter] = useState<{ lat: number; lng: number } | null>(
-    hasInitial ? { lat: initialLat, lng: initialLng } : null,
+    hasInitial ? { lat: initialLat!, lng: initialLng! } : null,
   );
 
   const mapRef = useRef<MapRef>(null);
   const abortRef = useRef<AbortController | null>(null);
-  const geocodeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const searchBarRef = useRef<HTMLDivElement>(null);
 
-  const reverseGeocode = useCallback(() => {
-    const center = mapRef.current?.getCenter();
-    if (!center) return;
-
+  const reverseGeocodeAt = useCallback((lat: number, lng: number) => {
     if (abortRef.current) abortRef.current.abort();
     const controller = new AbortController();
     abortRef.current = controller;
 
     setIsGeocoding(true);
-    setPinLocked(true);
-    setMapCenter({ lat: center.lat, lng: center.lng });
-
-    const lat = center.lat;
-    const lng = center.lng;
 
     fetch(
       `https://api.mapbox.com/geocoding/v5/mapbox.places/${lng.toFixed(6)},${lat.toFixed(6)}.json?limit=1&access_token=${TOKEN}`,
@@ -89,23 +71,11 @@ export function LocationPickerOverlay({ initialLat, initialLng, initialName = ""
       })
       .catch((err: unknown) => {
         if (err instanceof Error && err.name !== "AbortError") {
-          const c = mapRef.current?.getCenter();
-          if (c) setPlaceName(`${c.lat.toFixed(5)}, ${c.lng.toFixed(5)}`);
+          setPlaceName(`${lat.toFixed(5)}, ${lng.toFixed(5)}`);
           setIsGeocoding(false);
         }
       });
   }, []);
-
-  function handleMoveEnd() {
-    if (geocodeTimerRef.current) clearTimeout(geocodeTimerRef.current);
-    geocodeTimerRef.current = setTimeout(reverseGeocode, 400);
-  }
-
-  function handleMoveStart() {
-    setPinLocked(false);
-    if (geocodeTimerRef.current) clearTimeout(geocodeTimerRef.current);
-    if (abortRef.current) abortRef.current.abort();
-  }
 
   const fetchSuggestions = useCallback(async (query: string) => {
     if (!query.trim() || query.length < 2) {
@@ -145,6 +115,7 @@ export function LocationPickerOverlay({ initialLat, initialLng, initialName = ""
     setPlaceName(s.placeName);
     const lat = parseFloat(s.lat);
     const lng = parseFloat(s.lng);
+    setPinPosition({ lat, lng });
     setMapCenter({ lat, lng });
     mapRef.current?.flyTo({ center: [lng, lat], zoom: 14 });
   }
@@ -156,10 +127,9 @@ export function LocationPickerOverlay({ initialLat, initialLng, initialName = ""
   }
 
   function handleConfirm() {
-    const lat = mapCenter ? String(mapCenter.lat) : (initialLat ? String(initialLat) : "0");
-    const lng = mapCenter ? String(mapCenter.lng) : (initialLng ? String(initialLng) : "0");
-    const name = placeName || (mapCenter ? `${mapCenter.lat.toFixed(5)}, ${mapCenter.lng.toFixed(5)}` : "");
-    onConfirm(name, lat, lng);
+    if (!pinPosition) return;
+    const name = placeName || `${pinPosition.lat.toFixed(5)}, ${pinPosition.lng.toFixed(5)}`;
+    onConfirm(name, String(pinPosition.lat), String(pinPosition.lng));
   }
 
   // Close dropdown on outside click
@@ -176,18 +146,14 @@ export function LocationPickerOverlay({ initialLat, initialLng, initialName = ""
   // Cleanup on unmount
   useEffect(() => {
     return () => {
-      if (geocodeTimerRef.current) clearTimeout(geocodeTimerRef.current);
       if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
       if (abortRef.current) abortRef.current.abort();
     };
   }, []);
 
-  // Trigger initial reverse geocode after map loads
   const handleMapLoad = useCallback(() => {
-    if (!initialName) {
-      reverseGeocode();
-    }
-  }, [initialName, reverseGeocode]);
+    // no-op: pin only placed on click or suggestion select
+  }, []);
 
   const content = (
     <div
@@ -205,16 +171,23 @@ export function LocationPickerOverlay({ initialLat, initialLng, initialName = ""
           latitude: hasInitial ? initialLat : 22.3193,
           zoom: hasInitial ? 14 : 10,
         }}
-        style={{ width: "100%", height: "100%" }}
+        style={{ width: "100%", height: "100%", cursor: "crosshair" }}
         dragRotate={false}
         pitchWithRotate={false}
-        onMoveStart={handleMoveStart}
-        onMoveEnd={handleMoveEnd}
         onLoad={handleMapLoad}
-      />
-
-      {/* Fixed crosshair */}
-      <CrosshairPin locked={pinLocked} />
+        onClick={(e) => {
+          const { lat, lng } = e.lngLat;
+          setPinPosition({ lat, lng });
+          setMapCenter({ lat, lng });
+          reverseGeocodeAt(lat, lng);
+        }}
+      >
+        {pinPosition && (
+          <Marker longitude={pinPosition.lng} latitude={pinPosition.lat} anchor="bottom">
+            <PinMarker />
+          </Marker>
+        )}
+      </Map>
 
       {/* Floating search bar */}
       <div
@@ -303,7 +276,9 @@ export function LocationPickerOverlay({ initialLat, initialLng, initialName = ""
       >
         <div className="bg-white rounded-2xl shadow-lg px-4 py-3 flex items-center gap-3">
           <div className="flex-1 min-w-0">
-            {isGeocoding ? (
+            {!pinPosition ? (
+              <p className="text-[14px] text-[#A09B96]">Tap the map to place a pin</p>
+            ) : isGeocoding ? (
               <div className="space-y-1.5">
                 <div className="h-4 bg-[#E5E0DA] rounded animate-pulse w-3/4" />
                 <div className="h-3 bg-[#F0EDE8] rounded animate-pulse w-1/2" />
@@ -311,7 +286,7 @@ export function LocationPickerOverlay({ initialLat, initialLng, initialName = ""
             ) : (
               <>
                 <p className="text-[15px] font-semibold text-[#1A1512] truncate leading-tight">
-                  {placeName || "Locating…"}
+                  {placeName || "Unknown location"}
                 </p>
                 {mapCenter && (
                   <p className="text-[11px] text-[#A09B96] mt-0.5">
@@ -324,7 +299,7 @@ export function LocationPickerOverlay({ initialLat, initialLng, initialName = ""
           <button
             type="button"
             onClick={handleConfirm}
-            disabled={isGeocoding && !placeName}
+            disabled={!pinPosition || (isGeocoding && !placeName)}
             className="flex-shrink-0 px-5 py-2.5 bg-[#E8622A] text-white text-[14px] font-semibold rounded-xl hover:bg-[#D4541F] active:bg-[#BF4A1A] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             Confirm

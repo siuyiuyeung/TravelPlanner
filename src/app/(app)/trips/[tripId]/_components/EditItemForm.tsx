@@ -208,6 +208,8 @@ export function EditItemForm({ item, tripId, userId, onSuccess, onDelete }: Prop
           <label className="block text-xs font-semibold text-[#6B6560] mb-1">Location</label>
           <LocationAutocomplete
             value={location}
+            lat={locationLat}
+            lng={locationLng}
             onChange={(val, lat, lng) => {
               setLocation(val);
               setLocationLat(lat);
