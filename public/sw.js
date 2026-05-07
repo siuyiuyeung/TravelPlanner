@@ -1,9 +1,9 @@
-const CACHE_NAME = 'tripsync-shell-v2';
+const CACHE_NAME = 'tripsync-shell-v3';
 
 // App shell assets to cache on install
+// Do NOT include auth-gated routes (/, /dashboard) — they return redirects,
+// and caching a redirected response causes ERR_FAILED on navigation.
 const SHELL_URLS = [
-  '/',
-  '/dashboard',
   '/manifest.json',
   '/icons/icon-192.png',
   '/icons/icon-512.png',
