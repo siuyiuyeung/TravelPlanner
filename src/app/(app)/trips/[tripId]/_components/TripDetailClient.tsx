@@ -368,22 +368,28 @@ export function TripDetailClient({ tripId, userId }: Props) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [scheduledPinnedItems]);
 
-  // Split per-leg geometries into discrete polyline segments (gaps at "none" legs)
+  // One entry per leg (not accumulated) — each leg is a separate GeoJSON feature so
+  // same-day overlapping legs compound opacity and different-day layers blend colors
   const routeSegments = useMemo(() => {
     if (scheduledPinnedItems.length < 2) return [];
+    const dayKeys = [...new Set(
+      scheduledPinnedItems
+        .map(i => toDateKey(i.startTime))
+        .filter((k): k is string => k !== null)
+    )].sort();
+    const result: { coords: [number, number][]; dayIndex: number }[] = [];
     const legs = scheduledPinnedItems.slice(0, -1);
-    const segments: [number, number][][] = [];
-    let current: [number, number][] = [];
-    for (const item of legs) {
+    for (let i = 0; i < legs.length; i++) {
+      const item = legs[i]!;
+      const nextItem = scheduledPinnedItems[i + 1]!;
+      const itemDayKey = toDateKey(item.startTime);
+      const nextDayKey = toDateKey(nextItem.startTime);
+      if (!itemDayKey || itemDayKey !== nextDayKey) continue;
       const coords = legCoords[item.id] ?? [];
-      if (coords.length === 0) {
-        if (current.length > 0) { segments.push(current); current = []; }
-      } else {
-        current = [...current, ...coords];
-      }
+      if (coords.length < 2) continue;
+      result.push({ coords: [...coords], dayIndex: dayKeys.indexOf(itemDayKey) });
     }
-    if (current.length > 0) segments.push(current);
-    return segments;
+    return result;
   }, [scheduledPinnedItems, legCoords]);
 
   const totalKm = useMemo(

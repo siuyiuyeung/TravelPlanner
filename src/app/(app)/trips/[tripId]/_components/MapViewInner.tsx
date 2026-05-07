@@ -46,7 +46,7 @@ export type AddToPlanPayload = {
 type Props = {
   items: MapItem[];
   onSelectItem: (id: string) => void;
-  routeSegments: [number, number][][];
+  routeSegments: { coords: [number, number][]; dayIndex: number }[];
   totalKm?: number | undefined;
   legDistances?: Record<string, number> | undefined;
   legDurations?: Record<string, number> | undefined;
@@ -407,20 +407,35 @@ export function MapViewInner({ items, onSelectItem, routeSegments, totalKm, legD
 
   const isSatellite = styleKey === "satellite";
 
-  const routeGeoJSON: GeoJSON.FeatureCollection = {
+  // Shared casing GeoJSON (all routes) — drawn once below all colored lines
+  const routeCasingGeoJSON: GeoJSON.FeatureCollection = {
     type: "FeatureCollection",
     features: routeSegments
-      .filter((seg) => seg.length > 1)
-      .map((seg, i) => ({
-        type: "Feature",
+      .filter((seg) => seg.coords.length > 1)
+      .map((seg) => ({
+        type: "Feature" as const,
         geometry: {
-          type: "LineString",
-          // incoming segments are [lat, lng] — flip to [lng, lat] for GL
-          coordinates: seg.map(([lat, lng]) => [lng, lat]),
+          type: "LineString" as const,
+          coordinates: seg.coords.map(([lat, lng]) => [lng, lat]),
         },
-        properties: { color: ROUTE_COLORS[i % ROUTE_COLORS.length] },
+        properties: {},
       })),
   };
+
+  // Per-day colored GeoJSON — stacked on top of casing so adjacent day colors composite/blend at overlaps
+  const routeGeoJSONs = ROUTE_COLORS.map((_, dayIdx) => ({
+    type: "FeatureCollection" as const,
+    features: routeSegments
+      .filter((seg) => seg.dayIndex % ROUTE_COLORS.length === dayIdx && seg.coords.length > 1)
+      .map((seg) => ({
+        type: "Feature" as const,
+        geometry: {
+          type: "LineString" as const,
+          coordinates: seg.coords.map(([lat, lng]) => [lng, lat]),
+        },
+        properties: {},
+      })),
+  }));
 
   const userPosGeoJSON: GeoJSON.FeatureCollection | null = userPos
     ? {
@@ -711,21 +726,25 @@ export function MapViewInner({ items, onSelectItem, routeSegments, totalKm, legD
           />
         )}
 
-        {/* Route polylines — casing + fill, Google Maps style */}
-        <Source id="routes" type="geojson" data={routeGeoJSON}>
+        {/* Route polylines — casing first (all days), then per-day colored lines so they blend at overlaps */}
+        <Source id="routes-casing" type="geojson" data={routeCasingGeoJSON}>
           <Layer
-            id="route-casing"
+            id="route-casing-all"
             type="line"
-            paint={{ "line-color": "#ffffff", "line-width": 10, "line-opacity": 0.9 }}
-            layout={{ "line-cap": "round", "line-join": "round", visibility: showRoutes ? "visible" : "none" }}
-          />
-          <Layer
-            id="route-line"
-            type="line"
-            paint={{ "line-color": ["get", "color"], "line-width": 6, "line-opacity": 1 }}
+            paint={{ "line-color": "#ffffff", "line-width": 10, "line-opacity": 0.8 }}
             layout={{ "line-cap": "round", "line-join": "round", visibility: showRoutes ? "visible" : "none" }}
           />
         </Source>
+        {ROUTE_COLORS.map((color, dayIdx) => (
+          <Source key={dayIdx} id={`routes-day-${dayIdx}`} type="geojson" data={routeGeoJSONs[dayIdx]!}>
+            <Layer
+              id={`route-line-${dayIdx}`}
+              type="line"
+              paint={{ "line-color": color, "line-width": 6, "line-opacity": 0.5 }}
+              layout={{ "line-cap": "round", "line-join": "round", visibility: showRoutes ? "visible" : "none" }}
+            />
+          </Source>
+        ))}
 
         {/* User location */}
         {userPosGeoJSON && (

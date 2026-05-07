@@ -22,7 +22,7 @@ type AddToPlanPayload = {
 type Props = {
   items: MapItem[];
   onSelectItem: (id: string) => void;
-  routeSegments: [number, number][][];
+  routeSegments: { coords: [number, number][]; dayIndex: number }[];
   totalKm?: number | undefined;
   legDistances?: Record<string, number> | undefined;
   legDurations?: Record<string, number> | undefined;
