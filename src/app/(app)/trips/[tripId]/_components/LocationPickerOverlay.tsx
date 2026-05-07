@@ -3,13 +3,13 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import Map, { type MapRef, Marker } from "react-map-gl/mapbox";
 import "mapbox-gl/dist/mapbox-gl.css";
+import { newUUID } from "@/lib/utils";
 
 const TOKEN = process.env.NEXT_PUBLIC_MAPBOX_TOKEN ?? "";
 
 type Suggestion = {
-  placeName: string;
-  lat: string;
-  lng: string;
+  mapbox_id: string;
+  displayName: string;
 };
 
 type Props = {
@@ -52,6 +52,7 @@ export function LocationPickerOverlay({ initialLat, initialLng, initialName = ""
   const abortRef = useRef<AbortController | null>(null);
   const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const searchBarRef = useRef<HTMLDivElement>(null);
+  const sessionToken = useRef(newUUID());
 
   const reverseGeocodeAt = useCallback((lat: number, lng: number) => {
     if (abortRef.current) abortRef.current.abort();
@@ -77,21 +78,28 @@ export function LocationPickerOverlay({ initialLat, initialLng, initialName = ""
       });
   }, []);
 
-  const fetchSuggestions = useCallback(async (query: string) => {
+  const fetchSuggestions = useCallback(async (query: string, proximity: { lat: number; lng: number } | null) => {
     if (!query.trim() || query.length < 2) {
       setSuggestions([]);
       setDropdownOpen(false);
       return;
     }
     try {
-      const res = await fetch(
-        `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(query)}.json?limit=5&access_token=${TOKEN}`,
-      );
-      const data = await res.json() as { features: { place_name: string; center: [number, number] }[] };
-      const results: Suggestion[] = (data.features ?? []).map((f) => ({
-        placeName: f.place_name,
-        lat: String(f.center[1]),
-        lng: String(f.center[0]),
+      const url = new URL("https://api.mapbox.com/search/searchbox/v1/suggest");
+      url.searchParams.set("q", query);
+      url.searchParams.set("limit", "5");
+      url.searchParams.set("session_token", sessionToken.current);
+      url.searchParams.set("access_token", TOKEN);
+      if (proximity) {
+        url.searchParams.set("proximity", `${proximity.lng.toFixed(4)},${proximity.lat.toFixed(4)}`);
+      }
+      const res = await fetch(url.toString());
+      const data = await res.json() as {
+        suggestions: { mapbox_id: string; name: string; place_formatted?: string }[];
+      };
+      const results: Suggestion[] = (data.suggestions ?? []).map((s) => ({
+        mapbox_id: s.mapbox_id,
+        displayName: s.place_formatted ? `${s.name}, ${s.place_formatted}` : s.name,
       }));
       setSuggestions(results);
       setDropdownOpen(results.length > 0);
@@ -105,19 +113,34 @@ export function LocationPickerOverlay({ initialLat, initialLng, initialName = ""
     const q = e.target.value;
     setSearchQuery(q);
     if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
-    searchDebounceRef.current = setTimeout(() => void fetchSuggestions(q), 350);
+    searchDebounceRef.current = setTimeout(() => void fetchSuggestions(q, mapCenter), 350);
   }
 
-  function selectSuggestion(s: Suggestion) {
+  async function selectSuggestion(s: Suggestion) {
     setSearchQuery("");
     setSuggestions([]);
     setDropdownOpen(false);
-    setPlaceName(s.placeName);
-    const lat = parseFloat(s.lat);
-    const lng = parseFloat(s.lng);
-    setPinPosition({ lat, lng });
-    setMapCenter({ lat, lng });
-    mapRef.current?.flyTo({ center: [lng, lat], zoom: 14 });
+    try {
+      const url = new URL(`https://api.mapbox.com/search/searchbox/v1/retrieve/${s.mapbox_id}`);
+      url.searchParams.set("session_token", sessionToken.current);
+      url.searchParams.set("access_token", TOKEN);
+      sessionToken.current = newUUID();
+      const res = await fetch(url.toString());
+      const data = await res.json() as {
+        features: { geometry: { coordinates: [number, number] }; properties: { full_address?: string; name?: string } }[];
+      };
+      const feature = data.features?.[0];
+      if (!feature) return;
+      const placeName = feature.properties.full_address ?? feature.properties.name ?? s.displayName;
+      const lng = feature.geometry.coordinates[0];
+      const lat = feature.geometry.coordinates[1];
+      setPlaceName(placeName);
+      setPinPosition({ lat, lng });
+      setMapCenter({ lat, lng });
+      mapRef.current?.flyTo({ center: [lng, lat], zoom: 14 });
+    } catch {
+      // ignore retrieve errors
+    }
   }
 
   function clearSearch() {
@@ -241,15 +264,13 @@ export function LocationPickerOverlay({ initialLat, initialLng, initialName = ""
 
         {/* Search dropdown */}
         {dropdownOpen && suggestions.length > 0 && (
-          <div className="mt-1 bg-white rounded-2xl shadow-lg overflow-hidden border border-[#E5E0DA]">
+          <div className="mt-1 bg-white rounded-2xl shadow-lg overflow-y-auto max-h-[220px] border border-[#E5E0DA]" style={{ WebkitOverflowScrolling: "touch" }}>
             {suggestions.map((s, i) => (
               <button
                 key={i}
                 type="button"
-                onPointerDown={(e) => {
-                  e.preventDefault();
-                  selectSuggestion(s);
-                }}
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => void selectSuggestion(s)}
                 className="w-full text-left px-4 py-3 text-[14px] text-[#1A1512] hover:bg-[#FAF8F5] flex items-start gap-2 transition-colors"
               >
                 <span className="flex-shrink-0 text-[#A09B96] mt-0.5">
@@ -257,7 +278,7 @@ export function LocationPickerOverlay({ initialLat, initialLng, initialName = ""
                     <path d="M7 1C4.79 1 3 2.79 3 5c0 3 4 8 4 8s4-5 4-8c0-2.21-1.79-4-4-4zm0 5.5A1.5 1.5 0 1 1 7 3a1.5 1.5 0 0 1 0 3z" fill="currentColor" />
                   </svg>
                 </span>
-                <span className="leading-snug">{s.placeName}</span>
+                <span className="leading-snug">{s.displayName}</span>
               </button>
             ))}
           </div>

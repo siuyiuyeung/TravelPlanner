@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect, useCallback } from "react";
 import dynamic from "next/dynamic";
+import { newUUID } from "@/lib/utils";
 
 const LocationPickerOverlay = dynamic(
   () => import("./LocationPickerOverlay").then((m) => ({ default: m.LocationPickerOverlay })),
@@ -9,9 +10,8 @@ const LocationPickerOverlay = dynamic(
 );
 
 type Suggestion = {
-  placeName: string;
-  lat: string;
-  lng: string;
+  mapbox_id: string;
+  displayName: string;
 };
 
 type Props = {
@@ -20,11 +20,12 @@ type Props = {
   lng?: string | undefined;
   onChange: (value: string, lat?: string, lng?: string) => void;
   placeholder?: string;
+  proximity?: { lat: number; lng: number };
 };
 
 const TOKEN = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
 
-export function LocationAutocomplete({ value, lat, lng, onChange, placeholder = "Search for a place…" }: Props) {
+export function LocationAutocomplete({ value, lat, lng, onChange, placeholder = "Search for a place…", proximity }: Props) {
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
   const [open, setOpen] = useState(false);
   const [activeIdx, setActiveIdx] = useState(-1);
@@ -32,9 +33,10 @@ export function LocationAutocomplete({ value, lat, lng, onChange, placeholder = 
   const [overlayInit, setOverlayInit] = useState<{ lat: number; lng: number } | null>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-  const committed = useRef(false); // true after user picks a suggestion
+  const committed = useRef(false);
   const latRef = useRef<string | undefined>(lat);
   const lngRef = useRef<string | undefined>(lng);
+  const sessionToken = useRef(newUUID());
 
   const fetchSuggestions = useCallback(async (query: string) => {
     if (!query.trim() || query.length < 2) {
@@ -43,16 +45,21 @@ export function LocationAutocomplete({ value, lat, lng, onChange, placeholder = 
       return;
     }
     try {
-      const res = await fetch(
-        `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(query)}.json?limit=5&access_token=${TOKEN}`
-      );
+      const url = new URL("https://api.mapbox.com/search/searchbox/v1/suggest");
+      url.searchParams.set("q", query);
+      url.searchParams.set("limit", "5");
+      url.searchParams.set("session_token", sessionToken.current);
+      url.searchParams.set("access_token", TOKEN ?? "");
+      if (proximity) {
+        url.searchParams.set("proximity", `${proximity.lng.toFixed(4)},${proximity.lat.toFixed(4)}`);
+      }
+      const res = await fetch(url.toString());
       const data = await res.json() as {
-        features: { place_name: string; center: [number, number] }[];
+        suggestions: { mapbox_id: string; name: string; place_formatted?: string }[];
       };
-      const results: Suggestion[] = (data.features ?? []).map((f) => ({
-        placeName: f.place_name,
-        lat: String(f.center[1]),
-        lng: String(f.center[0]),
+      const results: Suggestion[] = (data.suggestions ?? []).map((s) => ({
+        mapbox_id: s.mapbox_id,
+        displayName: s.place_formatted ? `${s.name}, ${s.place_formatted}` : s.name,
       }));
       setSuggestions(results);
       setOpen(results.length > 0);
@@ -61,23 +68,39 @@ export function LocationAutocomplete({ value, lat, lng, onChange, placeholder = 
       setSuggestions([]);
       setOpen(false);
     }
-  }, []);
+  }, [proximity]);
 
   function handleInputChange(e: React.ChangeEvent<HTMLInputElement>) {
     const q = e.target.value;
     committed.current = false;
-    onChange(q, undefined, undefined); // clear coords when typing
+    onChange(q, undefined, undefined);
     if (debounceRef.current) clearTimeout(debounceRef.current);
-    debounceRef.current = setTimeout(() => fetchSuggestions(q), 350);
+    debounceRef.current = setTimeout(() => void fetchSuggestions(q), 350);
   }
 
-  function selectSuggestion(s: Suggestion) {
-    committed.current = true;
-    latRef.current = s.lat;
-    lngRef.current = s.lng;
-    onChange(s.placeName, s.lat, s.lng);
+  async function selectSuggestion(s: Suggestion) {
     setSuggestions([]);
     setOpen(false);
+    try {
+      const url = new URL(`https://api.mapbox.com/search/searchbox/v1/retrieve/${s.mapbox_id}`);
+      url.searchParams.set("session_token", sessionToken.current);
+      url.searchParams.set("access_token", TOKEN ?? "");
+      sessionToken.current = newUUID();
+      const res = await fetch(url.toString());
+      const data = await res.json() as {
+        features: { geometry: { coordinates: [number, number] }; properties: { full_address?: string; name?: string } }[];
+      };
+      const feature = data.features?.[0];
+      const placeName = feature?.properties.full_address ?? feature?.properties.name ?? s.displayName;
+      const resolvedLat = feature ? String(feature.geometry.coordinates[1]) : undefined;
+      const resolvedLng = feature ? String(feature.geometry.coordinates[0]) : undefined;
+      committed.current = true;
+      latRef.current = resolvedLat;
+      lngRef.current = resolvedLng;
+      onChange(placeName, resolvedLat, resolvedLng);
+    } catch {
+      // ignore retrieve errors
+    }
   }
 
   function handleKeyDown(e: React.KeyboardEvent) {
@@ -91,7 +114,7 @@ export function LocationAutocomplete({ value, lat, lng, onChange, placeholder = 
     } else if (e.key === "Enter" && activeIdx >= 0) {
       e.preventDefault();
       const s = suggestions[activeIdx];
-      if (s) selectSuggestion(s);
+      if (s) void selectSuggestion(s);
     } else if (e.key === "Escape") {
       setOpen(false);
     }
@@ -142,23 +165,21 @@ export function LocationAutocomplete({ value, lat, lng, onChange, placeholder = 
 
       {open && suggestions.length > 0 && (
         <ul
-          style={{ position: "absolute", top: "calc(100% + 4px)", left: 0, right: 0, zIndex: 9999 }}
-          className="bg-white border border-[#E5E0DA] rounded-[12px] shadow-[0_4px_20px_rgba(0,0,0,0.12)] overflow-hidden"
+          style={{ position: "absolute", top: "calc(100% + 4px)", left: 0, right: 0, zIndex: 9999, WebkitOverflowScrolling: "touch" }}
+          className="bg-white border border-[#E5E0DA] rounded-[12px] shadow-[0_4px_20px_rgba(0,0,0,0.12)] overflow-y-auto max-h-[220px]"
         >
           {suggestions.map((s, i) => (
             <li key={i}>
               <button
                 type="button"
-                onPointerDown={(e) => {
-                  e.preventDefault(); // prevent input blur before we capture the click
-                  selectSuggestion(s);
-                }}
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => void selectSuggestion(s)}
                 className={`w-full text-left px-4 py-3 text-[14px] transition-colors flex items-start gap-2 ${
                   i === activeIdx ? "bg-[#FDF1EC] text-[#E8622A]" : "text-[#1A1512] hover:bg-[#FAF8F5]"
                 }`}
               >
                 <span className="flex-shrink-0 text-[#A09B96] mt-0.5">📍</span>
-                <span className="leading-snug">{s.placeName}</span>
+                <span className="leading-snug">{s.displayName}</span>
               </button>
             </li>
           ))}

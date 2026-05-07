@@ -133,6 +133,9 @@ export function AddItemForm({ tripId, onSuccess, initialValues }: Props) {
               setLocationLat(lat);
               setLocationLng(lng);
             }}
+            {...(initialValues?.locationLat && initialValues?.locationLng
+              ? { proximity: { lat: parseFloat(initialValues.locationLat), lng: parseFloat(initialValues.locationLng) } }
+              : {})}
           />
         </div>
 

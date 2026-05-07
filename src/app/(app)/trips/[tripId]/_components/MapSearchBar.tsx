@@ -1,11 +1,17 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { newUUID } from "@/lib/utils";
 
 export type SearchResult = {
   placeName: string;
   lat: number;
   lng: number;
+};
+
+type RawSuggestion = {
+  mapbox_id: string;
+  displayName: string;
 };
 
 type Props = {
@@ -19,11 +25,12 @@ const MAPBOX_TOKEN = process.env.NEXT_PUBLIC_MAPBOX_TOKEN ?? "";
 export function MapSearchBar({ onSelect, onClear, proximity }: Props) {
   const [searchExpanded, setSearchExpanded] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
-  const [suggestions, setSuggestions] = useState<SearchResult[]>([]);
+  const [suggestions, setSuggestions] = useState<RawSuggestion[]>([]);
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const sessionToken = useRef(newUUID());
 
   useEffect(() => {
     if (searchExpanded) inputRef.current?.focus();
@@ -50,19 +57,21 @@ export function MapSearchBar({ onSelect, onClear, proximity }: Props) {
       return;
     }
     try {
-      const proximityParam = proximity
-        ? `&proximity=${proximity.lng.toFixed(4)},${proximity.lat.toFixed(4)}`
-        : "";
-      const res = await fetch(
-        `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(query)}.json?limit=5${proximityParam}&access_token=${MAPBOX_TOKEN}`
-      );
+      const url = new URL("https://api.mapbox.com/search/searchbox/v1/suggest");
+      url.searchParams.set("q", query);
+      url.searchParams.set("limit", "5");
+      url.searchParams.set("session_token", sessionToken.current);
+      url.searchParams.set("access_token", MAPBOX_TOKEN);
+      if (proximity) {
+        url.searchParams.set("proximity", `${proximity.lng.toFixed(4)},${proximity.lat.toFixed(4)}`);
+      }
+      const res = await fetch(url.toString());
       const data = (await res.json()) as {
-        features: { place_name: string; center: [number, number] }[];
+        suggestions: { mapbox_id: string; name: string; place_formatted?: string }[];
       };
-      const results: SearchResult[] = (data.features ?? []).map((f) => ({
-        placeName: f.place_name,
-        lat: f.center[1],
-        lng: f.center[0],
+      const results: RawSuggestion[] = (data.suggestions ?? []).map((s) => ({
+        mapbox_id: s.mapbox_id,
+        displayName: s.place_formatted ? `${s.name}, ${s.place_formatted}` : s.name,
       }));
       setSuggestions(results);
       setDropdownOpen(results.length > 0);
@@ -79,11 +88,29 @@ export function MapSearchBar({ onSelect, onClear, proximity }: Props) {
     debounceRef.current = setTimeout(() => fetchSuggestions(val), 350);
   }
 
-  function handleSelect(result: SearchResult) {
-    setSearchQuery(result.placeName);
+  async function handleSelect(suggestion: RawSuggestion) {
+    setSearchQuery(suggestion.displayName);
     setSuggestions([]);
     setDropdownOpen(false);
-    onSelect(result);
+    try {
+      const url = new URL(`https://api.mapbox.com/search/searchbox/v1/retrieve/${suggestion.mapbox_id}`);
+      url.searchParams.set("session_token", sessionToken.current);
+      url.searchParams.set("access_token", MAPBOX_TOKEN);
+      sessionToken.current = newUUID();
+      const res = await fetch(url.toString());
+      const data = (await res.json()) as {
+        features: { geometry: { coordinates: [number, number] }; properties: { full_address?: string; name?: string } }[];
+      };
+      const feature = data.features?.[0];
+      if (!feature) return;
+      onSelect({
+        placeName: feature.properties.full_address ?? feature.properties.name ?? suggestion.displayName,
+        lat: feature.geometry.coordinates[1],
+        lng: feature.geometry.coordinates[0],
+      });
+    } catch {
+      // ignore retrieve errors
+    }
   }
 
   function handleClear() {
@@ -151,8 +178,8 @@ export function MapSearchBar({ onSelect, onClear, proximity }: Props) {
                 {suggestions.map((s, i) => (
                   <li key={i}>
                     <button
-                      onPointerDown={(e) => e.preventDefault()}
-                      onClick={() => handleSelect(s)}
+                      onMouseDown={(e) => e.preventDefault()}
+                      onClick={() => void handleSelect(s)}
                       style={{
                         width: "100%", textAlign: "left", padding: "9px 12px",
                         background: "transparent", border: "none", cursor: "pointer",
@@ -161,7 +188,7 @@ export function MapSearchBar({ onSelect, onClear, proximity }: Props) {
                       }}
                     >
                       <span style={{ flexShrink: 0, marginTop: 1, fontSize: 12 }}>📍</span>
-                      <span style={{ lineHeight: 1.3 }}>{s.placeName}</span>
+                      <span style={{ lineHeight: 1.3 }}>{s.displayName}</span>
                     </button>
                   </li>
                 ))}

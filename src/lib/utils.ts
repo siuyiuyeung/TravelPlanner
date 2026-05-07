@@ -26,6 +26,16 @@ export function timeAgo(d: Date | string): string {
   return `${Math.floor(hrs / 24)}d ago`;
 }
 
+export function newUUID(): string {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID();
+  }
+  return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0;
+    return (c === "x" ? r : (r & 0x3) | 0x8).toString(16);
+  });
+}
+
 export function formatDateRange(start: string, end: string): string {
   const s = new Date(start);
   const e = new Date(end);

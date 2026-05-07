@@ -215,6 +215,9 @@ export function EditItemForm({ item, tripId, userId, onSuccess, onDelete }: Prop
               setLocationLat(lat);
               setLocationLng(lng);
             }}
+            {...(item.locationLat && item.locationLng
+              ? { proximity: { lat: parseFloat(item.locationLat), lng: parseFloat(item.locationLng) } }
+              : {})}
           />
         </div>
 
