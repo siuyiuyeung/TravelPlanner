@@ -462,20 +462,26 @@ export function MapViewInner({ items, onSelectItem, routeSegments, totalKm, legD
       })),
   };
 
-  // Per-day colored GeoJSON — stacked on top of casing so adjacent day colors composite/blend at overlaps
-  const routeGeoJSONs = ROUTE_COLORS.map((_, dayIdx) => ({
-    type: "FeatureCollection" as const,
-    features: routeSegments
-      .filter((seg) => seg.dayIndex % ROUTE_COLORS.length === dayIdx && seg.coords.length > 1)
-      .map((seg) => ({
-        type: "Feature" as const,
-        geometry: {
-          type: "LineString" as const,
-          coordinates: seg.coords.map(([lat, lng]) => [lng, lat]),
-        },
-        properties: {},
-      })),
-  }));
+  // Per-segment colored GeoJSON — each segment is its own layer so same-color overlaps compound opacity → darker
+  const routeSegmentLayers = routeSegments
+    .filter((seg) => seg.coords.length > 1)
+    .map((seg, segIdx) => ({
+      segIdx,
+      color: ROUTE_COLORS[seg.dayIndex % ROUTE_COLORS.length]!,
+      geoJson: {
+        type: "FeatureCollection" as const,
+        features: [
+          {
+            type: "Feature" as const,
+            geometry: {
+              type: "LineString" as const,
+              coordinates: seg.coords.map(([lat, lng]) => [lng, lat]),
+            },
+            properties: {},
+          },
+        ],
+      },
+    }));
 
   const userPosGeoJSON: GeoJSON.FeatureCollection | null = userPos
     ? {
@@ -840,10 +846,10 @@ export function MapViewInner({ items, onSelectItem, routeSegments, totalKm, legD
             layout={{ "line-cap": "round", "line-join": "round", visibility: showRoutes ? "visible" : "none" }}
           />
         </Source>
-        {ROUTE_COLORS.map((color, dayIdx) => (
-          <Source key={dayIdx} id={`routes-day-${dayIdx}`} type="geojson" data={routeGeoJSONs[dayIdx]!}>
+        {routeSegmentLayers.map(({ segIdx, color, geoJson }) => (
+          <Source key={segIdx} id={`routes-seg-${segIdx}`} type="geojson" data={geoJson}>
             <Layer
-              id={`route-line-${dayIdx}`}
+              id={`route-line-${segIdx}`}
               type="line"
               paint={{ "line-color": color, "line-width": 6, "line-opacity": 0.5 }}
               layout={{ "line-cap": "round", "line-join": "round", visibility: showRoutes ? "visible" : "none" }}
