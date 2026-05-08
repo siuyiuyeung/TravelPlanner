@@ -12,6 +12,7 @@ import Map, {
 import type { GeoJSON } from "geojson";
 import "mapbox-gl/dist/mapbox-gl.css";
 import { MapSearchBar, type SearchResult } from "./MapSearchBar";
+import { BottomSheet, BottomSheetTitle } from "@/components/ui/bottom-sheet";
 
 type PoiFeature = {
   type: "Feature";
@@ -115,6 +116,26 @@ function fmtDur(secs: number) {
   return m === 0 ? `${h}h` : `${h}h${m}m`;
 }
 
+async function reverseGeocodeAll(lng: number, lat: number): Promise<GeocodedResult[]> {
+  try {
+    const url = new URL("https://api.mapbox.com/search/searchbox/v1/reverse");
+    url.searchParams.set("longitude", String(lng));
+    url.searchParams.set("latitude", String(lat));
+    url.searchParams.set("access_token", MAPBOX_TOKEN);
+    const res = await fetch(url.toString());
+    if (!res.ok) return [];
+    const data = (await res.json()) as {
+      features: { properties: { full_address?: string; name?: string } }[];
+    };
+    return (data.features ?? []).map((f) => ({
+      name: f.properties.name ?? f.properties.full_address ?? "Dropped Pin",
+      fullAddress: f.properties.full_address ?? f.properties.name ?? "Dropped Pin",
+    }));
+  } catch {
+    return [];
+  }
+}
+
 function MarkerPin({ emoji, seq }: { emoji: string; seq: number }) {
   return (
     <div style={{ position: "relative", width: 36, height: 36 }}>
@@ -163,6 +184,18 @@ function MarkerPin({ emoji, seq }: { emoji: string; seq: number }) {
 }
 
 type LocateStatus = "idle" | "loading" | "error";
+
+type GeocodedResult = {
+  name: string;
+  fullAddress: string;
+};
+
+type DroppedPin = {
+  lng: number;
+  lat: number;
+  name: string | null;       // null = user hasn't picked yet
+  fullAddress: string | null;
+};
 
 function LocateControl({ onLocate }: { onLocate: (lng: number, lat: number) => void }) {
   const { current: mapRef } = useMap();
@@ -392,6 +425,13 @@ export function MapViewInner({ items, onSelectItem, routeSegments, totalKm, legD
   const [selectedPoi, setSelectedPoi] = useState<PoiFeature | null>(null);
   const [searchResult, setSearchResult] = useState<SearchResult | null>(null);
   const [selectedSearchPin, setSelectedSearchPin] = useState(false);
+  const [droppedPin, setDroppedPin] = useState<DroppedPin | null>(null);
+  const [droppedPinOpen, setDroppedPinOpen] = useState(false);
+  const [geocodeResults, setGeocodeResults] = useState<GeocodedResult[] | null>(null);
+  const [geocodePickerOpen, setGeocodePickerOpen] = useState(false);
+  const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const touchStartPos = useRef<{ x: number; y: number } | null>(null);
+  const geocodeRequestId = useRef(0);
 
   const pinned = items.filter((i) => i.locationLat !== null && i.locationLng !== null);
   const positions = pinned.map((i) => ({
@@ -485,6 +525,37 @@ export function MapViewInner({ items, onSelectItem, routeSegments, totalKm, legD
     [activePoiCategory, fetchPoi],
   );
 
+  const openDroppedPin = useCallback((lng: number, lat: number) => {
+    setSelectedItemId(null);
+    setSelectedPoi(null);
+    setSelectedSearchPin(false);
+    setDroppedPinOpen(false);
+    setDroppedPin({ lng, lat, name: null, fullAddress: null });
+    setGeocodeResults(null);
+    setGeocodePickerOpen(true);
+    const reqId = ++geocodeRequestId.current;
+    void reverseGeocodeAll(lng, lat).then((results) => {
+      if (geocodeRequestId.current === reqId) {
+        setGeocodeResults(results);
+      }
+    });
+  }, []);
+
+  const handleLongPress = useCallback((clientX: number, clientY: number) => {
+    const map = mapRef.current?.getMap();
+    if (!map) return;
+    const rect = map.getContainer().getBoundingClientRect();
+    const { lng, lat } = map.unproject([clientX - rect.left, clientY - rect.top]);
+    navigator.vibrate?.(50);
+    openDroppedPin(lng, lat);
+  }, [openDroppedPin]);
+
+  useEffect(() => {
+    return () => {
+      if (longPressTimer.current) clearTimeout(longPressTimer.current);
+    };
+  }, []);
+
   function handleLoad() {
     if (positions.length === 0 || fitted.current) return;
     fitted.current = true;
@@ -501,7 +572,36 @@ export function MapViewInner({ items, onSelectItem, routeSegments, totalKm, legD
   }
 
   return (
-    <div style={{ position: "relative", width: "100%", height: "100%" }}>
+    <div
+  style={{ position: "relative", width: "100%", height: "100%" }}
+  onTouchStart={(e) => {
+    if (e.touches.length !== 1) {
+      if (longPressTimer.current) { clearTimeout(longPressTimer.current); longPressTimer.current = null; }
+      return;
+    }
+    const t = e.touches[0]!;
+    touchStartPos.current = { x: t.clientX, y: t.clientY };
+    longPressTimer.current = setTimeout(() => handleLongPress(t.clientX, t.clientY), 500);
+  }}
+  onTouchMove={(e) => {
+    if (e.touches.length !== 1) {
+      if (longPressTimer.current) { clearTimeout(longPressTimer.current); longPressTimer.current = null; }
+      return;
+    }
+    const t = e.touches[0]!;
+    const dx = t.clientX - (touchStartPos.current?.x ?? t.clientX);
+    const dy = t.clientY - (touchStartPos.current?.y ?? t.clientY);
+    if (Math.hypot(dx, dy) > 8) {
+      if (longPressTimer.current) { clearTimeout(longPressTimer.current); longPressTimer.current = null; }
+    }
+  }}
+  onTouchEnd={() => {
+    if (longPressTimer.current) { clearTimeout(longPressTimer.current); longPressTimer.current = null; }
+  }}
+  onTouchCancel={() => {
+    if (longPressTimer.current) { clearTimeout(longPressTimer.current); longPressTimer.current = null; }
+  }}
+>
       {/* Search bar */}
       <MapSearchBar
         proximity={mapCenter}
@@ -696,6 +796,11 @@ export function MapViewInner({ items, onSelectItem, routeSegments, totalKm, legD
           const c = mapRef.current?.getMap().getCenter();
           if (c) setMapCenter({ lng: c.lng, lat: c.lat });
         }}
+        onContextMenu={(e) => {
+          e.originalEvent.preventDefault();
+          navigator.vibrate?.(50);
+          openDroppedPin(e.lngLat.lng, e.lngLat.lat);
+        }}
       >
         <TerrainSetter />
 
@@ -772,7 +877,7 @@ export function MapViewInner({ items, onSelectItem, routeSegments, totalKm, legD
               longitude={pos.lng}
               latitude={pos.lat}
               anchor="bottom"
-              onClick={() => { setSelectedPoi(null); setSelectedSearchPin(false); setSelectedItemId(item.id); }}
+              onClick={() => { setSelectedPoi(null); setSelectedSearchPin(false); setDroppedPin(null); setDroppedPinOpen(false); setSelectedItemId(item.id); }}
             >
               <MarkerPin emoji={emoji} seq={idx + 1} />
             </Marker>
@@ -844,6 +949,8 @@ export function MapViewInner({ items, onSelectItem, routeSegments, totalKm, legD
                 e.originalEvent.stopPropagation();
                 setSelectedItemId(null);
                 setSelectedSearchPin(false);
+                setDroppedPin(null);
+                setDroppedPinOpen(false);
                 setSelectedPoi(poi);
               }}
             >
@@ -926,6 +1033,8 @@ export function MapViewInner({ items, onSelectItem, routeSegments, totalKm, legD
               e.originalEvent.stopPropagation();
               setSelectedItemId(null);
               setSelectedPoi(null);
+              setDroppedPin(null);
+              setDroppedPinOpen(false);
               setSelectedSearchPin(true);
             }}
           >
@@ -997,10 +1106,133 @@ export function MapViewInner({ items, onSelectItem, routeSegments, totalKm, legD
           </Popup>
         )}
 
+        {/* Dropped pin marker */}
+        {droppedPin && (
+          <Marker
+            longitude={droppedPin.lng}
+            latitude={droppedPin.lat}
+            anchor="bottom"
+            onClick={(e) => { e.originalEvent.stopPropagation(); setDroppedPinOpen(true); }}
+          >
+            <div style={{
+              width: 32, height: 32, borderRadius: "50%",
+              background: "#DB4437", border: "2.5px solid white",
+              display: "flex", alignItems: "center", justifyContent: "center",
+              fontSize: 15, boxShadow: "0 2px 8px rgba(219,68,55,0.45)", cursor: "pointer",
+            }}>📍</div>
+          </Marker>
+        )}
+
+        {/* Dropped pin popup — only renders after user picks a result */}
+        {droppedPin && droppedPinOpen && droppedPin.name !== null && (
+          <Popup
+            longitude={droppedPin.lng}
+            latitude={droppedPin.lat}
+            anchor="bottom"
+            offset={20}
+            onClose={() => { setDroppedPin(null); setDroppedPinOpen(false); }}
+            closeButton={false}
+            closeOnClick={false}
+            maxWidth="220px"
+          >
+            <div style={{ minWidth: 190, padding: "12px 14px 12px" }}>
+              <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 8, marginBottom: 4 }}>
+                <p style={{ fontWeight: 700, fontSize: 14, margin: 0, flex: 1 }}>{droppedPin.name}</p>
+                <button
+                  onClick={() => { setDroppedPin(null); setDroppedPinOpen(false); }}
+                  style={{ flexShrink: 0, width: 22, height: 22, borderRadius: "50%", background: "#F0EDE8", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, color: "#6B6560", lineHeight: 1 }}
+                >
+                  ×
+                </button>
+              </div>
+              {droppedPin.fullAddress && (
+                <p style={{ fontSize: 12, color: "#6B6560", margin: "0 0 10px" }}>
+                  {droppedPin.fullAddress}
+                </p>
+              )}
+              <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+                <button
+                  onClick={() => {
+                    if (!droppedPin?.name) return;
+                    const { name, fullAddress, lat, lng } = droppedPin;
+                    setDroppedPin(null);
+                    setDroppedPinOpen(false);
+                    onAddToPlan({
+                      title: name,
+                      locationName: fullAddress ?? name,
+                      locationLat: String(lat),
+                      locationLng: String(lng),
+                    });
+                  }}
+                  style={{ flex: 1, padding: "6px 0", background: "#E8622A", color: "white", borderRadius: 8, fontSize: 12, fontWeight: 600, border: "none", cursor: "pointer" }}
+                >
+                  + Add to Plan
+                </button>
+                <a
+                  href={`https://maps.google.com?q=${droppedPin.lat},${droppedPin.lng}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{ flex: 1, padding: "6px 0", borderRadius: 8, background: "#F0EDE8", color: "#2D6A8F", fontSize: 12, fontWeight: 600, textAlign: "center", textDecoration: "none", display: "block" }}
+                >
+                  Maps ↗
+                </a>
+              </div>
+            </div>
+          </Popup>
+        )}
+
         <LocateControl onLocate={(lng, lat) => setUserPos({ lng, lat })} />
         <CompassReset />
       </Map>
       <ItemChips pinned={pinned} positions={positions} legDistances={legDistances} legDurations={legDurations} mapRef={mapRef} onSelect={setSelectedItemId} />
+
+      {/* Geocode result picker */}
+      <BottomSheet
+        open={geocodePickerOpen}
+        onOpenChange={(open) => {
+          if (!open) {
+            setGeocodePickerOpen(false);
+            setDroppedPin(null);
+            setGeocodeResults(null);
+          }
+        }}
+      >
+        <BottomSheetTitle>Select a location</BottomSheetTitle>
+        <div style={{ overflowY: "auto", flex: 1, paddingBottom: "env(safe-area-inset-bottom, 16px)" }}>
+          {geocodeResults === null ? (
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "center", padding: "32px 0" }}>
+              <div style={{ width: 24, height: 24, border: "2.5px solid #2D6A8F", borderTopColor: "transparent", borderRadius: "50%", animation: "spin 0.7s linear infinite" }} />
+            </div>
+          ) : geocodeResults.length === 0 ? (
+            <p style={{ textAlign: "center", fontSize: 14, color: "#A09B96", padding: "32px 20px" }}>
+              No nearby addresses found
+            </p>
+          ) : (
+            geocodeResults.map((result, i) => (
+              <button
+                key={i}
+                onClick={() => {
+                  if (!droppedPin) return;
+                  const { lng, lat } = droppedPin;
+                  setGeocodePickerOpen(false);
+                  setGeocodeResults(null);
+                  setDroppedPin({ lng, lat, name: result.name, fullAddress: result.fullAddress });
+                  setDroppedPinOpen(true);
+                }}
+                style={{
+                  width: "100%", display: "flex", flexDirection: "column", alignItems: "flex-start",
+                  padding: "12px 20px",
+                  borderBottom: i < geocodeResults.length - 1 ? "1px solid #F0EDE8" : "none",
+                  background: "transparent", border: "none", cursor: "pointer", textAlign: "left",
+                }}
+              >
+                <span style={{ fontSize: 14, fontWeight: 600, color: "#1A1512", lineHeight: 1.3 }}>{result.name}</span>
+                <span style={{ fontSize: 12, color: "#6B6560", lineHeight: 1.4, marginTop: 2 }}>{result.fullAddress}</span>
+              </button>
+            ))
+          )}
+        </div>
+      </BottomSheet>
     </div>
   );
 }
