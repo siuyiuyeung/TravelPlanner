@@ -420,6 +420,7 @@ export function MapViewInner({ items, onSelectItem, routeSegments, totalKm, legD
   const [droppedPinOpen, setDroppedPinOpen] = useState(false);
   const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const touchStartPos = useRef<{ x: number; y: number } | null>(null);
+  const geocodeRequestId = useRef(0);
 
   const pinned = items.filter((i) => i.locationLat !== null && i.locationLng !== null);
   const positions = pinned.map((i) => ({
@@ -519,9 +520,12 @@ export function MapViewInner({ items, onSelectItem, routeSegments, totalKm, legD
     setSelectedSearchPin(false);
     setDroppedPin({ lng, lat, name: null });
     setDroppedPinOpen(true);
-    void reverseGeocode(lng, lat).then((name) =>
-      setDroppedPin((prev) => (prev ? { ...prev, name } : prev))
-    );
+    const reqId = ++geocodeRequestId.current;
+    void reverseGeocode(lng, lat).then((name) => {
+      if (geocodeRequestId.current === reqId) {
+        setDroppedPin((prev) => (prev ? { ...prev, name } : prev));
+      }
+    });
   }, []);
 
   const handleLongPress = useCallback((clientX: number, clientY: number) => {
