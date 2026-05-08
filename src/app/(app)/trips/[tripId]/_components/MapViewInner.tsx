@@ -127,7 +127,7 @@ async function reverseGeocode(lng: number, lat: number): Promise<string> {
       features: { properties: { full_address?: string; name?: string } }[];
     };
     const props = data.features?.[0]?.properties;
-    return props?.name ?? props?.full_address ?? "Dropped Pin";
+    return props?.full_address ?? props?.name ?? "Dropped Pin";
   } catch {
     return "Dropped Pin";
   }
