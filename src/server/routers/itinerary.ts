@@ -69,7 +69,13 @@ export const itineraryRouter = router({
     }),
 
   update: protectedProcedure
-    .input(createItemSchema.partial().extend({ itemId: z.string().uuid() }))
+    .input(
+      createItemSchema.partial().extend({
+        itemId: z.string().uuid(),
+        startTime: z.string().datetime().nullish(),
+        endTime: z.string().datetime().nullish(),
+      })
+    )
     .mutation(async ({ ctx, input }) => {
       const item = await ctx.db.query.itineraryItems.findFirst({
         where: eq(itineraryItems.id, input.itemId),
