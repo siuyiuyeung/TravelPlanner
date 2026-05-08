@@ -127,7 +127,7 @@ async function reverseGeocode(lng: number, lat: number): Promise<string> {
       features: { properties: { full_address?: string; name?: string } }[];
     };
     const props = data.features?.[0]?.properties;
-    return props?.full_address ?? props?.name ?? "Dropped Pin";
+    return props?.name ?? props?.full_address ?? "Dropped Pin";
   } catch {
     return "Dropped Pin";
   }
@@ -562,11 +562,19 @@ export function MapViewInner({ items, onSelectItem, routeSegments, totalKm, legD
     <div
   style={{ position: "relative", width: "100%", height: "100%" }}
   onTouchStart={(e) => {
+    if (e.touches.length !== 1) {
+      if (longPressTimer.current) { clearTimeout(longPressTimer.current); longPressTimer.current = null; }
+      return;
+    }
     const t = e.touches[0]!;
     touchStartPos.current = { x: t.clientX, y: t.clientY };
     longPressTimer.current = setTimeout(() => handleLongPress(t.clientX, t.clientY), 500);
   }}
   onTouchMove={(e) => {
+    if (e.touches.length !== 1) {
+      if (longPressTimer.current) { clearTimeout(longPressTimer.current); longPressTimer.current = null; }
+      return;
+    }
     const t = e.touches[0]!;
     const dx = t.clientX - (touchStartPos.current?.x ?? t.clientX);
     const dy = t.clientY - (touchStartPos.current?.y ?? t.clientY);
