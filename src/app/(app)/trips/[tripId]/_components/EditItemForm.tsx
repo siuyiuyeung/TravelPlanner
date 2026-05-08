@@ -115,12 +115,11 @@ export function EditItemForm({ item, tripId, userId, onSuccess, onDelete }: Prop
     setError("");
     if (!title.trim()) { setError("Title is required"); return; }
 
-    let startTime: string | undefined;
-    if (date) {
-      startTime = time
-        ? new Date(`${date}T${time}:00`).toISOString()
-        : new Date(`${date}T00:00:00`).toISOString();
-    }
+    const startTime = date
+      ? (time
+          ? new Date(`${date}T${time}:00`).toISOString()
+          : new Date(`${date}T00:00:00`).toISOString())
+      : null;
 
     updateItem.mutate({
       itemId: item.id,
@@ -183,18 +182,26 @@ export function EditItemForm({ item, tripId, userId, onSuccess, onDelete }: Prop
           />
         </div>
 
-        <div className="grid grid-cols-2 gap-2">
-          <div>
-            <label className="block text-xs font-semibold text-[#6B6560] mb-1">Date</label>
+        <div>
+          <div className="flex items-center justify-between mb-1">
+            <label className="text-xs font-semibold text-[#6B6560]">Date & Time</label>
+            {date && (
+              <button
+                type="button"
+                onClick={() => { setDate(""); setTime(""); }}
+                className="text-[11px] font-semibold text-[#A09B96]"
+              >
+                Unschedule ×
+              </button>
+            )}
+          </div>
+          <div className="grid grid-cols-2 gap-2">
             <input
               type="date"
               value={date}
               onChange={(e) => setDate(e.target.value)}
               className="w-full px-3 py-3 bg-[#F0EDE8] border border-[#E5E0DA] rounded-[10px] text-[16px] text-[#1A1512] focus:outline-none focus:border-[#E8622A]"
             />
-          </div>
-          <div>
-            <label className="block text-xs font-semibold text-[#6B6560] mb-1">Time</label>
             <input
               type="time"
               value={time}
