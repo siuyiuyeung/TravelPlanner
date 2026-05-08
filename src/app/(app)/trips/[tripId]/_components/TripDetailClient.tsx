@@ -665,6 +665,8 @@ export function TripDetailClient({ tripId, userId }: Props) {
         <>
           <div style={{ position: "fixed", inset: 0, zIndex: 10, display: "flex", flexDirection: "column" }}>
             <MapView
+              tripId={tripId}
+              userId={userId}
               items={mapFilteredPinnedItems}
               onSelectItem={(id) => setMapSelectedId(id)}
               routeSegments={routeSegments}

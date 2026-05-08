@@ -13,6 +13,8 @@ import type { GeoJSON } from "geojson";
 import "mapbox-gl/dist/mapbox-gl.css";
 import { MapSearchBar, type SearchResult } from "./MapSearchBar";
 import { BottomSheet, BottomSheetTitle } from "@/components/ui/bottom-sheet";
+import { api } from "@/lib/trpc/client";
+import { EditItemForm } from "./EditItemForm";
 
 type PoiFeature = {
   type: "Feature";
@@ -35,6 +37,8 @@ type MapItem = {
   locationLat: string | null;
   locationLng: string | null;
   startTime: Date | string | null;
+  endTime: Date | string | null;
+  description: string | null;
 };
 
 export type AddToPlanPayload = {
@@ -45,6 +49,8 @@ export type AddToPlanPayload = {
 };
 
 type Props = {
+  tripId: string;
+  userId: string;
   items: MapItem[];
   onSelectItem: (id: string) => void;
   routeSegments: { coords: [number, number][]; dayIndex: number }[];
@@ -410,7 +416,7 @@ function TerrainSetter() {
   return null;
 }
 
-export function MapViewInner({ items, onSelectItem, routeSegments, totalKm, legDistances, legDurations, onAddToPlan }: Props) {
+export function MapViewInner({ tripId, userId, items, onSelectItem, routeSegments, totalKm, legDistances, legDurations, onAddToPlan }: Props) {
   const mapRef = useRef<MapRef>(null);
   const fitted = useRef(false);
   const [styleKey, setStyleKey] = useState<StyleKey>("streets");
@@ -429,6 +435,8 @@ export function MapViewInner({ items, onSelectItem, routeSegments, totalKm, legD
   const [droppedPinOpen, setDroppedPinOpen] = useState(false);
   const [geocodeResults, setGeocodeResults] = useState<GeocodedResult[] | null>(null);
   const [geocodePickerOpen, setGeocodePickerOpen] = useState(false);
+  const [editItem, setEditItem] = useState<MapItem | null>(null);
+  const utils = api.useUtils();
   const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const touchStartPos = useRef<{ x: number; y: number } | null>(null);
   const geocodeRequestId = useRef(0);
@@ -802,6 +810,13 @@ export function MapViewInner({ items, onSelectItem, routeSegments, totalKm, legD
           const c = mapRef.current?.getMap().getCenter();
           if (c) setMapCenter({ lng: c.lng, lat: c.lat });
         }}
+        onClick={() => {
+          setSelectedItemId(null);
+          setSelectedPoi(null);
+          setSelectedSearchPin(false);
+          setDroppedPin(null);
+          setDroppedPinOpen(false);
+        }}
         onContextMenu={(e) => {
           e.originalEvent.preventDefault();
           navigator.vibrate?.(50);
@@ -883,7 +898,7 @@ export function MapViewInner({ items, onSelectItem, routeSegments, totalKm, legD
               longitude={pos.lng}
               latitude={pos.lat}
               anchor="bottom"
-              onClick={() => { setSelectedPoi(null); setSelectedSearchPin(false); setDroppedPin(null); setDroppedPinOpen(false); setSelectedItemId(item.id); }}
+              onClick={(e) => { e.originalEvent.stopPropagation(); setSelectedPoi(null); setSelectedSearchPin(false); setDroppedPin(null); setDroppedPinOpen(false); setSelectedItemId(item.id); }}
             >
               <MarkerPin emoji={emoji} seq={idx + 1} />
             </Marker>
@@ -908,10 +923,11 @@ export function MapViewInner({ items, onSelectItem, routeSegments, totalKm, legD
                   {ITEM_EMOJI[selectedItem.type] ?? "📌"} {selectedItem.title}
                 </p>
                 <button
-                  onClick={() => setSelectedItemId(null)}
-                  style={{ flexShrink: 0, width: 22, height: 22, borderRadius: "50%", background: "#F0EDE8", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, color: "#6B6560", lineHeight: 1 }}
+                  onClick={() => { setSelectedItemId(null); setEditItem(selectedItem); }}
+                  style={{ flexShrink: 0, width: 22, height: 22, borderRadius: "50%", background: "#F0EDE8", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, color: "#6B6560", lineHeight: 1, fontWeight: 700 }}
+                  aria-label="Edit item"
                 >
-                  ×
+                  ···
                 </button>
               </div>
               {selectedItem.locationName && (
@@ -985,17 +1001,9 @@ export function MapViewInner({ items, onSelectItem, routeSegments, totalKm, legD
             maxWidth="220px"
           >
             <div style={{ minWidth: 190, padding: "12px 14px 12px" }}>
-              <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 8, marginBottom: 4 }}>
-                <p style={{ fontWeight: 700, fontSize: 14, margin: 0, flex: 1 }}>
-                  {selectedPoi.properties.name}
-                </p>
-                <button
-                  onClick={() => setSelectedPoi(null)}
-                  style={{ flexShrink: 0, width: 22, height: 22, borderRadius: "50%", background: "#F0EDE8", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, color: "#6B6560", lineHeight: 1 }}
-                >
-                  ×
-                </button>
-              </div>
+              <p style={{ fontWeight: 700, fontSize: 14, margin: "0 0 4px" }}>
+                {selectedPoi.properties.name}
+              </p>
               {(selectedPoi.properties.full_address ?? selectedPoi.properties.place_formatted) && (
                 <p style={{ fontSize: 12, color: "#6B6560", margin: "0 0 10px" }}>
                   {selectedPoi.properties.full_address ?? selectedPoi.properties.place_formatted}
@@ -1070,17 +1078,9 @@ export function MapViewInner({ items, onSelectItem, routeSegments, totalKm, legD
             maxWidth="220px"
           >
             <div style={{ minWidth: 190, padding: "12px 14px 12px" }}>
-              <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 8, marginBottom: 4 }}>
-                <p style={{ fontWeight: 700, fontSize: 14, margin: 0, flex: 1 }}>
-                  {searchResult.placeName.split(",")[0]}
-                </p>
-                <button
-                  onClick={() => setSelectedSearchPin(false)}
-                  style={{ flexShrink: 0, width: 22, height: 22, borderRadius: "50%", background: "#F0EDE8", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, color: "#6B6560", lineHeight: 1 }}
-                >
-                  ×
-                </button>
-              </div>
+              <p style={{ fontWeight: 700, fontSize: 14, margin: "0 0 4px" }}>
+                {searchResult.placeName.split(",")[0]}
+              </p>
               <p style={{ fontSize: 12, color: "#6B6560", margin: "0 0 10px" }}>
                 {searchResult.placeName}
               </p>
@@ -1142,15 +1142,7 @@ export function MapViewInner({ items, onSelectItem, routeSegments, totalKm, legD
             maxWidth="220px"
           >
             <div style={{ minWidth: 190, padding: "12px 14px 12px" }}>
-              <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 8, marginBottom: 4 }}>
-                <p style={{ fontWeight: 700, fontSize: 14, margin: 0, flex: 1 }}>{droppedPin.name}</p>
-                <button
-                  onClick={() => { setDroppedPin(null); setDroppedPinOpen(false); }}
-                  style={{ flexShrink: 0, width: 22, height: 22, borderRadius: "50%", background: "#F0EDE8", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, color: "#6B6560", lineHeight: 1 }}
-                >
-                  ×
-                </button>
-              </div>
+              <p style={{ fontWeight: 700, fontSize: 14, margin: "0 0 4px" }}>{droppedPin.name}</p>
               {droppedPin.fullAddress && (
                 <p style={{ fontSize: 12, color: "#6B6560", margin: "0 0 10px" }}>
                   {droppedPin.fullAddress}
@@ -1238,6 +1230,23 @@ export function MapViewInner({ items, onSelectItem, routeSegments, totalKm, legD
             ))
           )}
         </div>
+      </BottomSheet>
+
+      {/* Edit item sheet */}
+      <BottomSheet open={editItem !== null} onOpenChange={(open) => { if (!open) setEditItem(null); }}>
+        <BottomSheetTitle>Edit Item</BottomSheetTitle>
+        {editItem && (
+          <EditItemForm
+            item={editItem}
+            tripId={tripId}
+            userId={userId}
+            onSuccess={() => {
+              setEditItem(null);
+              utils.trips.getById.invalidate({ tripId });
+            }}
+            onDelete={() => setEditItem(null)}
+          />
+        )}
       </BottomSheet>
     </div>
   );
