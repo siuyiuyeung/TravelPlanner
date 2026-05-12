@@ -707,22 +707,33 @@ export function TripDetailClient({ tripId, userId }: Props) {
             {showMapFilter && (
               <div
                 style={{ position: "absolute", top: 'calc(var(--tab-bar-height) + 8px)', left: 0, right: 0, zIndex: 10, pointerEvents: "none" } as React.CSSProperties}
-                className="flex gap-2 px-4 overflow-x-auto"
               >
-                {mapChips.map(chip => (
-                  <button
-                    key={chip.key ?? "all"}
-                    onClick={() => setMapDay(mapDay === chip.key ? null : chip.key)}
-                    style={{ pointerEvents: "auto" }}
-                    className={`flex-shrink-0 px-3.5 py-1.5 rounded-full text-[12px] font-semibold transition-colors shadow-sm ${
-                      mapDay === chip.key
-                        ? "bg-[#E8622A] text-white"
-                        : "bg-white/90 text-[#6B6560]"
-                    }`}
-                  >
-                    {chip.label}
-                  </button>
-                ))}
+                <div
+                  style={{
+                    pointerEvents: "auto",
+                    display: "flex",
+                    gap: "0.5rem",
+                    padding: "0 1rem",
+                    overflowX: "auto",
+                    WebkitOverflowScrolling: "touch",
+                    scrollbarWidth: "none",
+                    touchAction: "pan-x",
+                  } as React.CSSProperties}
+                >
+                  {mapChips.map(chip => (
+                    <button
+                      key={chip.key ?? "all"}
+                      onClick={() => setMapDay(mapDay === chip.key ? null : chip.key)}
+                      className={`flex-shrink-0 px-3.5 py-1.5 rounded-full text-[12px] font-semibold transition-colors shadow-sm ${
+                        mapDay === chip.key
+                          ? "bg-[#E8622A] text-white"
+                          : "bg-white/90 text-[#6B6560]"
+                      }`}
+                    >
+                      {chip.label}
+                    </button>
+                  ))}
+                </div>
               </div>
             )}
           </div>
