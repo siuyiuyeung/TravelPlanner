@@ -185,6 +185,7 @@ export function TripDetailClient({ tripId, userId }: Props) {
 
   const { data: trip, isLoading } = api.trips.getById.useQuery({ tripId });
   const { data: tripAttachments = [] } = api.attachments.listByTrip.useQuery({ tripId });
+  const { data: expenses = [] } = api.budget.listByTrip.useQuery({ tripId });
 
   const pingPresence = api.trips.pingPresence.useMutation();
   const leavePresence = api.trips.leavePresence.useMutation();
@@ -273,11 +274,13 @@ export function TripDetailClient({ tripId, userId }: Props) {
 
   // Only scheduled items participate in route computation
   const scheduledPinnedItems = mapFilteredPinnedItems.filter(i => i.startTime !== null);
+  // Always covers all days — used for route fetch and distance totals
+  const allScheduledPinnedItems = allPinnedItems.filter(i => i.startTime !== null);
 
-  const posKey = scheduledPinnedItems.map((i) => `${i.locationLat},${i.locationLng}`).join("|");
+  const posKey = allScheduledPinnedItems.map((i) => `${i.locationLat},${i.locationLng}`).join("|");
 
   useEffect(() => {
-    if (scheduledPinnedItems.length < 2) {
+    if (allScheduledPinnedItems.length < 2) {
       setRouteData(null);
       setLegDistances({});
       setLegDurations({});
@@ -285,10 +288,10 @@ export function TripDetailClient({ tripId, userId }: Props) {
       setLegCoords({});
       return;
     }
-    const legs = scheduledPinnedItems.slice(0, -1);
+    const legs = allScheduledPinnedItems.slice(0, -1);
     Promise.all(
       legs.map(async (item, i) => {
-        const to = scheduledPinnedItems[i + 1]!;
+        const to = allScheduledPinnedItems[i + 1]!;
         const isDayBoundary = toDateKey(item.startTime) !== toDateKey(to.startTime);
         const defaultMode: RouteMode = isDayBoundary ? "none" : "driving";
         const itemMode = (item.routeMode ?? defaultMode) as RouteMode;
@@ -336,16 +339,16 @@ export function TripDetailClient({ tripId, userId }: Props) {
   const handleLegModeChange = useCallback(async (itemId: string, mode: RouteMode) => {
     setLegModes((prev) => ({ ...prev, [itemId]: mode }));
     updateItem.mutate({ itemId, tripId, routeMode: mode });
-    const idx = scheduledPinnedItems.findIndex((i) => i.id === itemId);
-    if (idx === -1 || idx >= scheduledPinnedItems.length - 1) return;
+    const idx = allScheduledPinnedItems.findIndex((i) => i.id === itemId);
+    if (idx === -1 || idx >= allScheduledPinnedItems.length - 1) return;
     if (mode === "none") {
       setLegDistances((prev) => ({ ...prev, [itemId]: 0 }));
       setLegDurations((prev) => ({ ...prev, [itemId]: 0 }));
       setLegCoords((prev) => ({ ...prev, [itemId]: [] }));
       return;
     }
-    const from = scheduledPinnedItems[idx]!;
-    const to = scheduledPinnedItems[idx + 1]!;
+    const from = allScheduledPinnedItems[idx]!;
+    const to = allScheduledPinnedItems[idx + 1]!;
     const coordStr = `${from.locationLng},${from.locationLat};${to.locationLng},${to.locationLat}`;
     const profile = MAPBOX_PROFILE[mode];
     try {
@@ -366,7 +369,7 @@ export function TripDetailClient({ tripId, userId }: Props) {
       // keep existing values on error
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [scheduledPinnedItems]);
+  }, [allScheduledPinnedItems]);
 
   // One entry per leg (not accumulated) — each leg is a separate GeoJSON feature so
   // same-day overlapping legs compound opacity and different-day layers blend colors
@@ -523,13 +526,39 @@ export function TripDetailClient({ tripId, userId }: Props) {
                   <p className="text-[11px] text-[#A09B96]">{label}</p>
                 </div>
               ))}
-            </div>
 
-            {/* Distance stat */}
-            <div className="bg-white border border-[#E5E0DA] rounded-[12px] p-3 text-center">
-              <p className="text-xl">📏</p>
-              <p className="text-[15px] font-bold text-[#1A1512] mt-1 truncate">{distStat}</p>
-              <p className="text-[11px] text-[#A09B96]">Distance</p>
+              {/* Distance */}
+              <div className="bg-white border border-[#E5E0DA] rounded-[12px] p-3 text-center">
+                <p className="text-xl">📏</p>
+                <p className="text-[15px] font-bold text-[#1A1512] mt-1 truncate">{distStat}</p>
+                <p className="text-[11px] text-[#A09B96]">Distance</p>
+              </div>
+
+              {/* Budget — actual expenses grouped by currency */}
+              {(() => {
+                const spentByCurrency = expenses.reduce<Record<string, number>>((acc, e) => {
+                  acc[e.currency] = (acc[e.currency] ?? 0) + e.amountCents;
+                  return acc;
+                }, {});
+                const costEntries = Object.entries(spentByCurrency);
+                return (
+                  <div className="col-span-2 bg-white border border-[#E5E0DA] rounded-[12px] p-3 text-center">
+                    <p className="text-xl">💰</p>
+                    {costEntries.length === 0 ? (
+                      <p className="text-[13px] text-[#A09B96] mt-1">No expenses yet</p>
+                    ) : (
+                      <div className="mt-1 space-y-0.5">
+                        {costEntries.map(([currency, cents]) => (
+                          <p key={currency} className="text-[13px] font-bold text-[#1A1512] truncate">
+                            {new Intl.NumberFormat("en", { style: "currency", currency }).format(cents / 100)}
+                          </p>
+                        ))}
+                      </div>
+                    )}
+                    <p className="text-[11px] text-[#A09B96] mt-1">Spent</p>
+                  </div>
+                );
+              })()}
             </div>
 
             {/* Next up */}
