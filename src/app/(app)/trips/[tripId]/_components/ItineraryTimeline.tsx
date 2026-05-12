@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect, useLayoutEffect } from "react";
+import { useState, useRef, useEffect, useLayoutEffect, forwardRef } from "react";
 import { api } from "@/lib/trpc/client";
 import { BottomSheet, BottomSheetTitle } from "@/components/ui/bottom-sheet";
 import { EditItemForm } from "./EditItemForm";
@@ -446,20 +446,7 @@ function ItemCard({
 
 // ── Day section ───────────────────────────────────────────────────────────────
 
-function DaySection({
-  dateStr,
-  dayIndex,
-  seqOffset,
-  items,
-  userId,
-  tripId,
-  legDistances,
-  legDurations,
-  legModes,
-  onLegModeChange,
-  onEdit,
-  onCastVote,
-}: {
+const DaySection = forwardRef<HTMLDivElement, {
   dateStr: string;
   dayIndex: number;
   seqOffset: number;
@@ -472,7 +459,20 @@ function DaySection({
   onLegModeChange?: ((itemId: string, mode: RouteMode) => void) | undefined;
   onEdit: (item: ItineraryItem) => void;
   onCastVote: (itemId: string, vote: VoteType) => void;
-}) {
+}>(function DaySection({
+  dateStr,
+  dayIndex,
+  seqOffset,
+  items,
+  userId,
+  tripId,
+  legDistances,
+  legDurations,
+  legModes,
+  onLegModeChange,
+  onEdit,
+  onCastVote,
+}, ref) {
   const utils = api.useUtils();
   const reorder = api.itinerary.reorder.useMutation({
     onSuccess: () => utils.trips.getById.invalidate({ tripId }),
@@ -505,7 +505,7 @@ function DaySection({
   const orderedItems = order.map((id) => items.find((i) => i.id === id)).filter(Boolean) as ItineraryItem[];
 
   return (
-    <div>
+    <div ref={ref}>
       {/* Day header */}
       <div className="flex items-baseline gap-2 mb-3 sticky top-0 bg-[#FAF8F5] py-1 z-10">
         <span className="font-mono text-[13px] font-bold text-[#F2A93B] tracking-wider">{mono}</span>
@@ -538,7 +538,7 @@ function DaySection({
       </div>
     </div>
   );
-}
+});
 
 // ── Main component ────────────────────────────────────────────────────────────
 
@@ -547,6 +547,10 @@ export function ItineraryTimeline({ items, tripId, userId, legDistances, legDura
   const [editItem, setEditItem] = useState<ItineraryItem | null>(null);
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   const [activeDay, setActiveDay] = useState<string | null>(null);
+  const [scrollDay, setScrollDay] = useState<string | null>(null);
+  const sectionRefs = useRef<Map<string, HTMLDivElement>>(new Map());
+  const chipRefs = useRef<Map<string, HTMLButtonElement>>(new Map());
+  const chipsRowRef = useRef<HTMLDivElement>(null);
 
   const castVote = api.itinerary.castVote.useMutation({
     onSuccess: () => utils.trips.getById.invalidate({ tripId }),
@@ -569,6 +573,45 @@ export function ItineraryTimeline({ items, tripId, userId, legDistances, legDura
   });
 
   const groups = groupByDate(sorted);
+
+  useEffect(() => {
+    if (activeDay !== null) return;
+
+    let rafId: number;
+
+    function update() {
+      const threshold = chipsRowRef.current?.getBoundingClientRect().bottom ?? 0;
+      let current: string | null = null;
+      let currentTop = -Infinity;
+      sectionRefs.current.forEach((el, key) => {
+        const top = el.getBoundingClientRect().top;
+        if (top <= threshold && top > currentTop) {
+          currentTop = top;
+          current = key;
+        }
+      });
+      setScrollDay(current);
+    }
+
+    function onScroll() {
+      cancelAnimationFrame(rafId);
+      rafId = requestAnimationFrame(update);
+    }
+
+    const scrollEl = document.getElementById("main-scroll") ?? window;
+    scrollEl.addEventListener("scroll", onScroll, { passive: true });
+    update();
+    return () => {
+      scrollEl.removeEventListener("scroll", onScroll);
+      cancelAnimationFrame(rafId);
+    };
+  }, [activeDay, groups]);
+
+  useEffect(() => {
+    const key = activeDay ?? scrollDay;
+    if (!key) return;
+    chipRefs.current.get(key)?.scrollIntoView({ behavior: "smooth", inline: "center", block: "nearest" });
+  }, [scrollDay, activeDay]);
 
   if (items.length === 0) {
     return (
@@ -594,13 +637,15 @@ export function ItineraryTimeline({ items, tripId, userId, legDistances, legDura
       {/* Day filter chips */}
       {dayChips.length > 1 && (
         <div
+          ref={chipsRowRef}
           className="sticky z-20 -mx-5 px-5 bg-gradient-to-b from-[#FAF8F5] to-transparent pt-2 pb-5 mb-0 flex gap-2 overflow-x-auto"
           style={{ top: 'var(--tab-bar-height)', scrollbarWidth: "none", WebkitOverflowScrolling: "touch" } as React.CSSProperties}
         >
           <button
-            onClick={() => setActiveDay(null)}
+            ref={(el) => { if (el) chipRefs.current.set("__all__", el); }}
+            onClick={() => { setActiveDay(null); setScrollDay(null); }}
             className={`flex-shrink-0 px-3.5 py-1.5 rounded-full text-[12px] font-semibold transition-colors ${
-              activeDay === null ? "bg-[#E8622A] text-white" : "bg-[#F0EDE8] text-[#6B6560]"
+              activeDay === null && scrollDay === null ? "bg-[#E8622A] text-white" : "bg-[#F0EDE8] text-[#6B6560]"
             }`}
           >
             All
@@ -608,9 +653,12 @@ export function ItineraryTimeline({ items, tripId, userId, legDistances, legDura
           {dayChips.map((chip) => (
             <button
               key={chip.key}
+              ref={(el) => { if (el) chipRefs.current.set(chip.key, el); }}
               onClick={() => setActiveDay(activeDay === chip.key ? null : chip.key)}
               className={`flex-shrink-0 px-3.5 py-1.5 rounded-full text-[12px] font-semibold transition-colors ${
-                activeDay === chip.key ? "bg-[#E8622A] text-white" : "bg-[#F0EDE8] text-[#6B6560]"
+                activeDay === chip.key || (activeDay === null && scrollDay === chip.key)
+                  ? "bg-[#E8622A] text-white"
+                  : "bg-[#F0EDE8] text-[#6B6560]"
               }`}
             >
               {chip.label}
@@ -633,6 +681,11 @@ export function ItineraryTimeline({ items, tripId, userId, legDistances, legDura
             return (
               <DaySection
                 key={dateStr || "no-date"}
+                ref={(el) => {
+                  const k = dateStr || "__none__";
+                  if (el) { el.dataset.day = k; sectionRefs.current.set(k, el); }
+                  else sectionRefs.current.delete(k);
+                }}
                 dateStr={dateStr}
                 dayIndex={originalIndex + 1}
                 seqOffset={groupSeqOffsets.get(dateStr || "__none__") ?? 0}
