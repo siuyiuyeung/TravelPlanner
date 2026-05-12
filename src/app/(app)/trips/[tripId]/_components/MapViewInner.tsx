@@ -436,7 +436,15 @@ export function MapViewInner({ tripId, userId, items, onSelectItem, routeSegment
   const [geocodeResults, setGeocodeResults] = useState<GeocodedResult[] | null>(null);
   const [geocodePickerOpen, setGeocodePickerOpen] = useState(false);
   const [editItem, setEditItem] = useState<MapItem | null>(null);
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   const utils = api.useUtils();
+  const deleteItem = api.itinerary.delete.useMutation({
+    onSuccess: () => {
+      setDeleteConfirmId(null);
+      setEditItem(null);
+      utils.trips.getById.invalidate({ tripId });
+    },
+  });
   const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const touchStartPos = useRef<{ x: number; y: number } | null>(null);
   const geocodeRequestId = useRef(0);
@@ -1244,9 +1252,30 @@ export function MapViewInner({ tripId, userId, items, onSelectItem, routeSegment
               setEditItem(null);
               utils.trips.getById.invalidate({ tripId });
             }}
-            onDelete={() => setEditItem(null)}
+            onDelete={() => { setEditItem(null); setDeleteConfirmId(editItem!.id); }}
           />
         )}
+      </BottomSheet>
+
+      {/* Delete confirm sheet */}
+      <BottomSheet open={deleteConfirmId !== null} onOpenChange={(open) => { if (!open) setDeleteConfirmId(null); }}>
+        <BottomSheetTitle>Delete item?</BottomSheetTitle>
+        <div className="px-5 pb-8 space-y-3">
+          <p className="text-sm text-[#6B6560]">This cannot be undone.</p>
+          <button
+            onClick={() => deleteItem.mutate({ itemId: deleteConfirmId! })}
+            disabled={deleteItem.isPending}
+            className="w-full py-4 bg-[#E84040] text-white font-bold text-[15px] rounded-[12px] disabled:opacity-50"
+          >
+            {deleteItem.isPending ? "Deleting…" : "Delete"}
+          </button>
+          <button
+            onClick={() => setDeleteConfirmId(null)}
+            className="w-full py-4 border border-[#E5E0DA] text-[#6B6560] font-semibold text-[15px] rounded-[12px]"
+          >
+            Cancel
+          </button>
+        </div>
       </BottomSheet>
     </div>
   );
