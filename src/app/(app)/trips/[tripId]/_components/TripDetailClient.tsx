@@ -400,6 +400,16 @@ export function TripDetailClient({ tripId, userId }: Props) {
     [legDistances]
   );
 
+  // Day-filtered distance for the Map badge — Home tab always uses totalKm
+  const mapTotalKm = useMemo(() => {
+    if (mapDay === null) return totalKm;
+    if (mapDay === "__none__") return 0;
+    return allScheduledPinnedItems.reduce((sum, item) => {
+      if (toDateKey(item.startTime) !== mapDay) return sum;
+      return sum + (legDistances[item.id] ?? 0);
+    }, 0);
+  }, [mapDay, totalKm, allScheduledPinnedItems, legDistances]);
+
   // Pull-to-refresh
   const handleRefresh = useCallback(async () => {
     await utils.trips.getById.invalidate({ tripId });
@@ -699,7 +709,7 @@ export function TripDetailClient({ tripId, userId }: Props) {
               items={mapFilteredPinnedItems}
               onSelectItem={(id) => setMapSelectedId(id)}
               routeSegments={routeSegments}
-              totalKm={totalKm || routeData?.totalKm}
+              totalKm={mapTotalKm || routeData?.totalKm}
               legDistances={legDistances}
               legDurations={legDurations}
               onAddToPlan={handleAddToPlan}
