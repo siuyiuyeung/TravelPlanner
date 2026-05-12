@@ -15,9 +15,9 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   }
 
   return (
-    <div className="flex flex-col h-full min-h-screen bg-[#FAF8F5]">
+    <div className="flex flex-col h-dvh overflow-hidden bg-[#FAF8F5]">
       <Onboarding />
-      <main id="main-scroll" className="flex-1 overflow-y-auto" style={{ paddingBottom: 'calc(58px + env(safe-area-inset-bottom, 0px))' }}>
+      <main id="main-scroll" className="flex-1 overflow-y-auto min-h-0">
         {children}
       </main>
       <BottomNav />
