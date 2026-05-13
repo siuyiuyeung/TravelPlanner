@@ -126,6 +126,8 @@ export const trips = pgTable("trips", {
   metadata: jsonb("metadata").default({}),
   budgetCents: integer("budget_cents").default(0).notNull(),
   budgetCurrency: char("budget_currency", { length: 3 }).default("HKD").notNull(),
+  isPublic: boolean("is_public").default(false).notNull(),
+  shareToken: uuid("share_token").defaultRandom().notNull().unique(),
   createdBy: text("created_by").notNull().references(() => users.id),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().$onUpdate(() => new Date()).notNull(),
@@ -133,6 +135,27 @@ export const trips = pgTable("trips", {
   index("trips_group_id_idx").on(t.groupId),
   index("trips_status_idx").on(t.status),
   index("trips_start_date_idx").on(t.startDate),
+]);
+
+// ─── Trip Access ──────────────────────────────────────────────────────────────
+
+export const tripEditors = pgTable("trip_editors", {
+  tripId: uuid("trip_id").notNull().references(() => trips.id, { onDelete: "cascade" }),
+  userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+}, (t) => [
+  unique("trip_editors_trip_id_user_id_uniq").on(t.tripId, t.userId),
+  index("trip_editors_trip_id_idx").on(t.tripId),
+  index("trip_editors_user_id_idx").on(t.userId),
+]);
+
+export const tripBlocked = pgTable("trip_blocked", {
+  tripId: uuid("trip_id").notNull().references(() => trips.id, { onDelete: "cascade" }),
+  userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+}, (t) => [
+  unique("trip_blocked_trip_id_user_id_uniq").on(t.tripId, t.userId),
+  index("trip_blocked_trip_id_idx").on(t.tripId),
 ]);
 
 // ─── Itinerary ────────────────────────────────────────────────────────────────

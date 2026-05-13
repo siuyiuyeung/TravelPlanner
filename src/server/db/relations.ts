@@ -14,6 +14,8 @@ import {
   userPresence,
   tripExpenses,
   packingItems,
+  tripEditors,
+  tripBlocked,
 } from "./schema";
 
 export const usersRelations = relations(users, ({ many }) => ({
@@ -47,6 +49,8 @@ export const tripsRelations = relations(trips, ({ one, many }) => ({
   presence: many(userPresence),
   expenses: many(tripExpenses),
   packingItems: many(packingItems),
+  editors: many(tripEditors),
+  blocked: many(tripBlocked),
 }));
 
 export const itineraryItemsRelations = relations(itineraryItems, ({ one, many }) => ({
@@ -92,4 +96,14 @@ export const tripExpensesRelations = relations(tripExpenses, ({ one }) => ({
 export const packingItemsRelations = relations(packingItems, ({ one }) => ({
   trip: one(trips, { fields: [packingItems.tripId], references: [trips.id] }),
   adder: one(users, { fields: [packingItems.addedBy], references: [users.id] }),
+}));
+
+export const tripEditorsRelations = relations(tripEditors, ({ one }) => ({
+  trip: one(trips, { fields: [tripEditors.tripId], references: [trips.id] }),
+  user: one(users, { fields: [tripEditors.userId], references: [users.id] }),
+}));
+
+export const tripBlockedRelations = relations(tripBlocked, ({ one }) => ({
+  trip: one(trips, { fields: [tripBlocked.tripId], references: [trips.id] }),
+  user: one(users, { fields: [tripBlocked.userId], references: [users.id] }),
 }));
