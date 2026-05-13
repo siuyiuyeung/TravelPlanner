@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useRef } from "react";
 import { BottomSheet } from "@/components/ui/bottom-sheet";
 import { api } from "@/lib/trpc/client";
 import { toast } from "sonner";
@@ -35,6 +35,7 @@ const AVATAR_COLORS = [
 export function ShareSheet({ open, onOpenChange, tripId, isPublic, shareToken, currentUserId }: Props) {
   const [selectedMember, setSelectedMember] = useState<Member | null>(null);
   const [memberSheetOpen, setMemberSheetOpen] = useState(false);
+  const urlInputRef = useRef<HTMLInputElement>(null);
 
   const utils = api.useUtils();
 
@@ -61,21 +62,18 @@ export function ShareSheet({ open, onOpenChange, tripId, isPublic, shareToken, c
       ? `${window.location.origin}/trips/share/${shareToken}`
       : `/trips/share/${shareToken}`;
 
-  const copyLink = useCallback((e: React.MouseEvent) => {
-    e.stopPropagation();
-    navigator.clipboard.writeText(shareUrl).then(() => {
-      toast.success("Link copied");
-    }).catch(() => {
-      // Fallback for when clipboard API is blocked (e.g. focus trap in sheet)
-      const el = document.createElement("input");
-      el.style.cssText = "position:fixed;opacity:0";
-      el.value = shareUrl;
-      document.body.appendChild(el);
-      el.select();
-      document.execCommand("copy");
-      document.body.removeChild(el);
-      toast.success("Link copied");
-    });
+  const copyLink = useCallback(async () => {
+    try {
+      await navigator.clipboard.writeText(shareUrl);
+    } catch {
+      // Fallback: select the hidden input that lives inside the sheet DOM
+      // so Vaul's focus trap doesn't block it
+      if (urlInputRef.current) {
+        urlInputRef.current.select();
+        document.execCommand("copy");
+      }
+    }
+    toast.success("Link copied");
   }, [shareUrl]);
 
   const handleResetLink = () => {
@@ -118,6 +116,9 @@ export function ShareSheet({ open, onOpenChange, tripId, isPublic, shareToken, c
               />
             </button>
           </div>
+
+          {/* Hidden input for execCommand fallback — must live inside sheet DOM */}
+          <input ref={urlInputRef} readOnly value={shareUrl} className="sr-only" aria-hidden />
 
           {/* Link row — show only when public */}
           {isPublic && (
