@@ -1,8 +1,9 @@
 import { TRPCError } from "@trpc/server";
 import { eq, and, asc } from "drizzle-orm";
 import { router, protectedProcedure, z } from "../trpc";
-import { itineraryItems, itemConfirmations, itemVotes, trips, groupMembers } from "../db/schema";
+import { itineraryItems, itemConfirmations, itemVotes, trips } from "../db/schema";
 import { broadcastTripUpdate } from "../sse";
+import { assertTripEditor, assertTripViewer } from "../db/queries/trip-access";
 
 const createItemSchema = z.object({
   tripId: z.string().uuid(),
@@ -21,27 +22,16 @@ const createItemSchema = z.object({
   routeMode: z.enum(["driving", "walking", "cycling", "transit", "none"]).optional(),
 });
 
-async function assertTripMember(
-  db: { query: { trips: { findFirst: (o: unknown) => Promise<unknown> }; groupMembers: { findFirst: (o: unknown) => Promise<unknown> } } },
-  tripId: string,
-  userId: string
-) {
-  const trip = await db.query.trips.findFirst({ where: eq(trips.id, tripId) }) as { groupId: string } | undefined;
-  if (!trip) throw new TRPCError({ code: "NOT_FOUND", message: "Trip not found" });
-
-  const membership = await db.query.groupMembers.findFirst({
-    where: and(eq(groupMembers.groupId, trip.groupId), eq(groupMembers.userId, userId)),
-  });
-  if (!membership) throw new TRPCError({ code: "FORBIDDEN" });
-
-  return { trip, membership };
-}
-
 export const itineraryRouter = router({
   listByTrip: protectedProcedure
     .input(z.object({ tripId: z.string().uuid() }))
     .query(async ({ ctx, input }) => {
-      await assertTripMember(ctx.db as Parameters<typeof assertTripMember>[0], input.tripId, ctx.session.user.id);
+      const tripRow = await ctx.db.query.trips.findFirst({
+        where: eq(trips.id, input.tripId),
+        columns: { groupId: true },
+      });
+      if (!tripRow) throw new TRPCError({ code: "NOT_FOUND" });
+      await assertTripViewer(ctx.db, input.tripId, tripRow.groupId, ctx.session.user.id);
       return ctx.db.query.itineraryItems.findMany({
         where: eq(itineraryItems.tripId, input.tripId),
         with: { confirmations: { with: { user: true } }, votes: true },
@@ -52,7 +42,12 @@ export const itineraryRouter = router({
   create: protectedProcedure
     .input(createItemSchema)
     .mutation(async ({ ctx, input }) => {
-      await assertTripMember(ctx.db as Parameters<typeof assertTripMember>[0], input.tripId, ctx.session.user.id);
+      const tripRow = await ctx.db.query.trips.findFirst({
+        where: eq(trips.id, input.tripId),
+        columns: { groupId: true },
+      });
+      if (!tripRow) throw new TRPCError({ code: "NOT_FOUND" });
+      await assertTripEditor(ctx.db, input.tripId, tripRow.groupId, ctx.session.user.id);
       const { startTime, endTime, ...rest } = input;
       const [item] = await ctx.db
         .insert(itineraryItems)
@@ -81,7 +76,12 @@ export const itineraryRouter = router({
         where: eq(itineraryItems.id, input.itemId),
       });
       if (!item) throw new TRPCError({ code: "NOT_FOUND" });
-      await assertTripMember(ctx.db as Parameters<typeof assertTripMember>[0], item.tripId, ctx.session.user.id);
+      const tripRow = await ctx.db.query.trips.findFirst({
+        where: eq(trips.id, item.tripId),
+        columns: { groupId: true },
+      });
+      if (!tripRow) throw new TRPCError({ code: "NOT_FOUND" });
+      await assertTripEditor(ctx.db, item.tripId, tripRow.groupId, ctx.session.user.id);
 
       const { itemId, startTime, endTime, ...rest } = input;
       const [updated] = await ctx.db
@@ -104,7 +104,12 @@ export const itineraryRouter = router({
         where: eq(itineraryItems.id, input.itemId),
       });
       if (!item) throw new TRPCError({ code: "NOT_FOUND" });
-      await assertTripMember(ctx.db as Parameters<typeof assertTripMember>[0], item.tripId, ctx.session.user.id);
+      const tripRow = await ctx.db.query.trips.findFirst({
+        where: eq(trips.id, item.tripId),
+        columns: { groupId: true },
+      });
+      if (!tripRow) throw new TRPCError({ code: "NOT_FOUND" });
+      await assertTripEditor(ctx.db, item.tripId, tripRow.groupId, ctx.session.user.id);
       await ctx.db.delete(itineraryItems).where(eq(itineraryItems.id, input.itemId));
       broadcastTripUpdate(item.tripId);
       return { success: true };
@@ -142,7 +147,12 @@ export const itineraryRouter = router({
         where: eq(itineraryItems.id, input.itemId),
       });
       if (!item) throw new TRPCError({ code: "NOT_FOUND" });
-      await assertTripMember(ctx.db as Parameters<typeof assertTripMember>[0], item.tripId, ctx.session.user.id);
+      const tripRow = await ctx.db.query.trips.findFirst({
+        where: eq(trips.id, item.tripId),
+        columns: { groupId: true },
+      });
+      if (!tripRow) throw new TRPCError({ code: "NOT_FOUND" });
+      await assertTripViewer(ctx.db, item.tripId, tripRow.groupId, ctx.session.user.id);
 
       const existing = await ctx.db.query.itemVotes.findFirst({
         where: and(
@@ -177,7 +187,12 @@ export const itineraryRouter = router({
       items: z.array(z.object({ id: z.string().uuid(), sortOrder: z.number().int() })),
     }))
     .mutation(async ({ ctx, input }) => {
-      await assertTripMember(ctx.db as Parameters<typeof assertTripMember>[0], input.tripId, ctx.session.user.id);
+      const tripRow = await ctx.db.query.trips.findFirst({
+        where: eq(trips.id, input.tripId),
+        columns: { groupId: true },
+      });
+      if (!tripRow) throw new TRPCError({ code: "NOT_FOUND" });
+      await assertTripEditor(ctx.db, input.tripId, tripRow.groupId, ctx.session.user.id);
       await Promise.all(
         input.items.map(({ id, sortOrder }) =>
           ctx.db.update(itineraryItems).set({ sortOrder }).where(eq(itineraryItems.id, id))
