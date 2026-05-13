@@ -25,14 +25,15 @@ export async function assertTripViewer(
   groupId: string,
   userId: string,
 ): Promise<void> {
-  const membership = await database.query.groupMembers.findFirst({
-    where: and(eq(groupMembers.groupId, groupId), eq(groupMembers.userId, userId)),
-  });
+  const [membership, blocked] = await Promise.all([
+    database.query.groupMembers.findFirst({
+      where: and(eq(groupMembers.groupId, groupId), eq(groupMembers.userId, userId)),
+    }),
+    database.query.tripBlocked.findFirst({
+      where: and(eq(tripBlocked.tripId, tripId), eq(tripBlocked.userId, userId)),
+    }),
+  ]);
   if (!membership) throw new TRPCError({ code: "FORBIDDEN" });
-
-  const blocked = await database.query.tripBlocked.findFirst({
-    where: and(eq(tripBlocked.tripId, tripId), eq(tripBlocked.userId, userId)),
-  });
   if (blocked) throw new TRPCError({ code: "FORBIDDEN" });
 }
 
@@ -44,6 +45,12 @@ export async function assertTripEditor(
   userId: string,
 ): Promise<void> {
   await assertTripViewer(database, tripId, groupId, userId);
+
+  const trip = await database.query.trips.findFirst({
+    where: eq(trips.id, tripId),
+    columns: { createdBy: true },
+  });
+  if (trip?.createdBy === userId) return;
 
   const editorRow = await database.query.tripEditors.findFirst({
     where: and(eq(tripEditors.tripId, tripId), eq(tripEditors.userId, userId)),
@@ -59,6 +66,7 @@ export async function getTripMemberAccess(
 ): Promise<{ userId: string; name: string; image: string | null; isEditor: boolean; isBlocked: boolean; isCreator: boolean }[]> {
   const trip = await database.query.trips.findFirst({
     where: eq(trips.id, tripId),
+    columns: { createdBy: true, groupId: true },
   });
   if (!trip) throw new TRPCError({ code: "NOT_FOUND" });
 
@@ -101,12 +109,10 @@ export async function revokeTripEditor(database: Db, tripId: string, userId: str
 }
 
 export async function blockTripMember(database: Db, tripId: string, userId: string): Promise<void> {
-  // Remove from editors first, then block
-  await revokeTripEditor(database, tripId, userId);
-  await database
-    .insert(tripBlocked)
-    .values({ tripId, userId })
-    .onConflictDoNothing();
+  await database.transaction(async (tx) => {
+    await tx.delete(tripEditors).where(and(eq(tripEditors.tripId, tripId), eq(tripEditors.userId, userId)));
+    await tx.insert(tripBlocked).values({ tripId, userId }).onConflictDoNothing();
+  });
 }
 
 export async function unblockTripMember(database: Db, tripId: string, userId: string): Promise<void> {
