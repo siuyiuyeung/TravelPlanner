@@ -16,6 +16,7 @@ import { AttachmentUpload } from "./AttachmentUpload";
 import { BudgetTab } from "./BudgetTab";
 import { MapView } from "./MapView";
 import { PackingTab } from "./PackingTab";
+import { ShareSheet } from "./ShareSheet";
 
 type RouterOutput = inferRouterOutputs<AppRouter>;
 type Trip = RouterOutput["trips"]["getById"];
@@ -158,6 +159,7 @@ export function TripDetailClient({ tripId, userId }: Props) {
   const [mapSelectedId, setMapSelectedId] = useState<string | null>(null);
   const [mapDay, setMapDay] = useState<string | null>(null);
   const [routeData, setRouteData] = useState<RouteData | null>(null);
+  const [shareOpen, setShareOpen] = useState(false);
   const [legModes, setLegModes] = useState<Record<string, RouteMode>>({});
   const [legDistances, setLegDistances] = useState<Record<string, number>>({});
   const [legDurations, setLegDurations] = useState<Record<string, number>>({});
@@ -475,6 +477,22 @@ export function TripDetailClient({ tripId, userId }: Props) {
           >
             ←
           </button>
+          {trip.isEditor && (
+            <button
+              onClick={() => setShareOpen(true)}
+              style={{ top: 'calc(env(safe-area-inset-top, 0px) + 12px)' }}
+              className="absolute right-5 w-9 h-9 rounded-full bg-white/15 flex items-center justify-center text-white"
+              aria-label="Share trip"
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="18" cy="5" r="3" />
+                <circle cx="6" cy="12" r="3" />
+                <circle cx="18" cy="19" r="3" />
+                <line x1="8.59" y1="13.51" x2="15.42" y2="17.49" />
+                <line x1="15.41" y1="6.51" x2="8.59" y2="10.49" />
+              </svg>
+            </button>
+          )}
 
           <div className="mt-8">
             <p className="text-white/60 text-xs font-medium mb-1">{trip.group.name}</p>
@@ -821,6 +839,17 @@ export function TripDetailClient({ tripId, userId }: Props) {
           {...(addItemPrefill ? { initialValues: addItemPrefill } : {})}
         />
       </BottomSheet>
+
+      {trip.isEditor && (
+        <ShareSheet
+          open={shareOpen}
+          onOpenChange={setShareOpen}
+          tripId={tripId}
+          isPublic={trip.isPublic}
+          shareToken={trip.shareToken}
+          currentUserId={userId}
+        />
+      )}
     </div>
   );
 }
