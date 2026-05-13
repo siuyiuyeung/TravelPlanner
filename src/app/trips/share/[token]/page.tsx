@@ -10,12 +10,7 @@ export default async function PublicTripPage({ params }: Props) {
   const { token } = await params;
 
   const api = await createServerCaller();
-  let trip;
-  try {
-    trip = await api.trips.getPublic({ shareToken: token });
-  } catch {
-    notFound();
-  }
+  const trip = await api.trips.getPublic({ shareToken: token }).catch(() => notFound());
 
   return <PublicTripView trip={trip} />;
 }
