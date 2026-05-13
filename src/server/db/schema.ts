@@ -156,6 +156,7 @@ export const tripBlocked = pgTable("trip_blocked", {
 }, (t) => [
   unique("trip_blocked_trip_id_user_id_uniq").on(t.tripId, t.userId),
   index("trip_blocked_trip_id_idx").on(t.tripId),
+  index("trip_blocked_user_id_idx").on(t.userId),
 ]);
 
 // ─── Itinerary ────────────────────────────────────────────────────────────────

@@ -27,6 +27,8 @@ export const usersRelations = relations(users, ({ many }) => ({
   itemConfirmations: many(itemConfirmations),
   comments: many(tripComments),
   presence: many(userPresence),
+  editableTrips: many(tripEditors),
+  blockedFromTrips: many(tripBlocked),
 }));
 
 export const groupsRelations = relations(groups, ({ one, many }) => ({
