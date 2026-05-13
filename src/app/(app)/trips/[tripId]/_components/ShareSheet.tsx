@@ -61,9 +61,21 @@ export function ShareSheet({ open, onOpenChange, tripId, isPublic, shareToken, c
       ? `${window.location.origin}/trips/share/${shareToken}`
       : `/trips/share/${shareToken}`;
 
-  const copyLink = useCallback(async () => {
-    await navigator.clipboard.writeText(shareUrl);
-    toast.success("Link copied");
+  const copyLink = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation();
+    navigator.clipboard.writeText(shareUrl).then(() => {
+      toast.success("Link copied");
+    }).catch(() => {
+      // Fallback for when clipboard API is blocked (e.g. focus trap in sheet)
+      const el = document.createElement("input");
+      el.style.cssText = "position:fixed;opacity:0";
+      el.value = shareUrl;
+      document.body.appendChild(el);
+      el.select();
+      document.execCommand("copy");
+      document.body.removeChild(el);
+      toast.success("Link copied");
+    });
   }, [shareUrl]);
 
   const handleResetLink = () => {
@@ -100,7 +112,7 @@ export function ShareSheet({ open, onOpenChange, tripId, isPublic, shareToken, c
               }`}
             >
               <span
-                className={`absolute top-[3px] w-5 h-5 bg-white rounded-full shadow transition-transform ${
+                className={`absolute left-0 top-[3px] w-5 h-5 bg-white rounded-full shadow transition-transform ${
                   isPublic ? "translate-x-[22px]" : "translate-x-[3px]"
                 }`}
               />
