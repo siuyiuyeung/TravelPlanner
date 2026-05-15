@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import type { createServerCaller } from "@/lib/trpc/server";
+import { PublicMapView } from "./PublicMapView";
 
 type PublicTrip = Awaited<ReturnType<Awaited<ReturnType<typeof createServerCaller>>["trips"]["getPublic"]>>;
 type ItineraryItem = PublicTrip["itineraryItems"][number];
@@ -225,6 +226,7 @@ export function PublicTripView({ trip }: { trip: PublicTrip }) {
   const [legModes, setLegModes] = useState<Record<string, RouteMode>>({});
   const [legDistances, setLegDistances] = useState<Record<string, number>>({});
   const [legDurations, setLegDurations] = useState<Record<string, number>>({});
+  const [legCoords, setLegCoords] = useState<Record<string, [number, number][]>>({});
 
   const sorted = [...trip.itineraryItems].sort((a, b) => {
     const aTime = a.startTime ? new Date(a.startTime).getTime() : null;
@@ -245,6 +247,7 @@ export function PublicTripView({ trip }: { trip: PublicTrip }) {
       setLegDistances({});
       setLegDurations({});
       setLegModes({});
+      setLegCoords({});
       return;
     }
     const legs = pinnedItems.slice(0, -1);
@@ -255,38 +258,70 @@ export function PublicTripView({ trip }: { trip: PublicTrip }) {
         const defaultMode: RouteMode = isDayBoundary ? "none" : "driving";
         const itemMode = (item.routeMode ?? defaultMode) as RouteMode;
         if (itemMode === "none") {
-          return { id: item.id, mode: itemMode, distance: 0, duration: 0 };
+          return { id: item.id, mode: itemMode, distance: 0, duration: 0, coords: [] as [number, number][] };
         }
         const coordStr = `${item.locationLng},${item.locationLat};${to.locationLng},${to.locationLat}`;
         const profile = MAPBOX_PROFILE[itemMode];
         const r = await fetch(
-          `https://api.mapbox.com/directions/v5/mapbox/${profile}/${coordStr}?geometries=geojson&overview=false&access_token=${MAPBOX_TOKEN}`,
+          `https://api.mapbox.com/directions/v5/mapbox/${profile}/${coordStr}?geometries=geojson&overview=full&access_token=${MAPBOX_TOKEN}`,
         );
-        const data = (await r.json()) as { routes?: { distance: number; duration: number }[] };
+        const data = (await r.json()) as { routes?: { distance: number; duration: number; geometry: { coordinates: [number, number][] } }[] };
         const route = data.routes?.[0];
-        return { id: item.id, mode: itemMode, distance: route?.distance ?? 0, duration: route?.duration ?? 0 };
+        return {
+          id: item.id, mode: itemMode,
+          distance: route?.distance ?? 0, duration: route?.duration ?? 0,
+          coords: (route?.geometry.coordinates ?? []).map(([lng, lat]) => [lat, lng] as [number, number]),
+        };
       }),
     ).then((results) => {
       const distances: Record<string, number> = {};
       const durations: Record<string, number> = {};
       const modes: Record<string, RouteMode> = {};
+      const coords: Record<string, [number, number][]> = {};
       results.forEach((r) => {
         distances[r.id] = r.distance / 1000;
         durations[r.id] = r.duration;
         modes[r.id] = r.mode;
+        coords[r.id] = r.coords;
       });
       setLegDistances(distances);
       setLegDurations(durations);
       setLegModes(modes);
+      setLegCoords(coords);
     }).catch(() => {
       setLegDistances({});
       setLegDurations({});
       setLegModes({});
+      setLegCoords({});
     });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pinnedItems.map((i) => `${i.id}:${i.routeMode}`).join("|")]);
 
   const groups = groupByDate(sorted);
+
+  const routeSegments = useMemo(() => {
+    if (pinnedItems.length < 2) return [];
+    const dayKeys = [...new Set(
+      pinnedItems.map((i) => toDateKey(i.startTime)).filter((k): k is string => k !== ""),
+    )].sort();
+    const result: { coords: [number, number][]; dayIndex: number }[] = [];
+    for (let i = 0; i < pinnedItems.length - 1; i++) {
+      const item = pinnedItems[i]!;
+      const next = pinnedItems[i + 1]!;
+      const itemDay = toDateKey(item.startTime);
+      const nextDay = toDateKey(next.startTime);
+      if (!itemDay || itemDay !== nextDay) continue;
+      const coords = legCoords[item.id] ?? [];
+      if (coords.length < 2) continue;
+      result.push({ coords: [...coords], dayIndex: dayKeys.indexOf(itemDay) });
+    }
+    return result;
+  }, [pinnedItems, legCoords]);
+
+  const totalKm = useMemo(
+    () => Object.values(legDistances).reduce((s, v) => s + v, 0),
+    [legDistances],
+  );
 
   useEffect(() => {
     if (activeDay !== null) return;
@@ -375,7 +410,7 @@ export function PublicTripView({ trip }: { trip: PublicTrip }) {
       </div>
 
       {/* Content */}
-      <div className="flex-1 px-5 pt-4 pb-8">
+      <div className={`flex-1 ${tab === "map" ? "flex flex-col overflow-hidden" : "px-5 pt-4 pb-8"}`}>
         {tab === "itinerary" && (
           <>
             {/* Day filter chips */}
@@ -446,7 +481,13 @@ export function PublicTripView({ trip }: { trip: PublicTrip }) {
           </>
         )}
         {tab === "map" && (
-          <p className="text-[13px] text-[#A09B96] text-center py-12">Map view available in the app.</p>
+          <PublicMapView
+            items={sorted}
+            routeSegments={routeSegments}
+            totalKm={totalKm > 0 ? totalKm : undefined}
+            legDistances={legDistances}
+            legDurations={legDurations}
+          />
         )}
       </div>
     </div>
