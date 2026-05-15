@@ -37,12 +37,12 @@ export function LoginForm() {
   return (
     <div className="w-full max-w-sm">
       {/* Logo / Brand */}
-      <div className="text-center mb-8">
-        <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-[#E8622A] mb-4">
-          <span className="text-2xl">✈️</span>
+      <div className="flex items-center justify-center gap-3 mb-8">
+        <img src="/icons/icon-192.png" alt="TravelPlanner" className="w-14 h-14 rounded-2xl shrink-0" />
+        <div>
+          <h1 className="text-2xl font-bold text-[#1A1512] tracking-tight">TravelPlanner</h1>
+          <p className="text-sm text-[#6B6560]">Plan together, travel better</p>
         </div>
-        <h1 className="text-2xl font-bold text-[#1A1512] tracking-tight">TravelPlanner</h1>
-        <p className="text-sm text-[#6B6560] mt-1">Plan together, travel better</p>
       </div>
 
       <div className="bg-white rounded-[20px] p-6 shadow-[0_2px_16px_rgba(26,21,18,0.08)]">
