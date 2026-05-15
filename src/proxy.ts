@@ -9,7 +9,8 @@ export async function proxy(request: NextRequest) {
   const isOpenRoute =
     pathname.startsWith("/verify-email") ||
     pathname.startsWith("/reset-password") ||
-    pathname.startsWith("/join/");
+    pathname.startsWith("/join/") ||
+    pathname.startsWith("/trips/share/");
 
   // Auth-only routes — unauthenticated users may access; authenticated users are
   // redirected to the dashboard (they don't need login/register again)
