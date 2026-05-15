@@ -227,6 +227,7 @@ export function PublicTripView({ trip }: { trip: PublicTrip }) {
   const [legDistances, setLegDistances] = useState<Record<string, number>>({});
   const [legDurations, setLegDurations] = useState<Record<string, number>>({});
   const [legCoords, setLegCoords] = useState<Record<string, [number, number][]>>({});
+  const [mapDay, setMapDay] = useState<string | null>(null);
 
   const sorted = [...trip.itineraryItems].sort((a, b) => {
     const aTime = a.startTime ? new Date(a.startTime).getTime() : null;
@@ -241,6 +242,33 @@ export function PublicTripView({ trip }: { trip: PublicTrip }) {
   const pinnedItems = sorted.filter(
     (i) => i.startTime !== null && i.locationLat !== null && i.locationLng !== null,
   );
+
+  // Map day-filter metadata
+  const allMapItems = sorted.filter(i => i.locationLat !== null && i.locationLng !== null);
+  const pinnedDates = [...new Set(
+    allMapItems
+      .filter(i => i.startTime !== null)
+      .map(i => toDateKey(i.startTime))
+      .filter((d): d is string => d !== "")
+  )].sort();
+  const hasUnscheduledPinned = allMapItems.some(i => i.startTime === null);
+  const showMapFilter = pinnedDates.length + (hasUnscheduledPinned ? 1 : 0) > 1;
+  const allDates = [...new Set(
+    sorted.filter(i => i.startTime !== null)
+      .map(i => toDateKey(i.startTime))
+      .filter((d): d is string => d !== "")
+  )].sort();
+  const dayIndexMap = new Map(allDates.map((d, i) => [d, i + 1]));
+  const mapChips: { key: string | null; label: string }[] = [
+    { key: null, label: "All" },
+    ...pinnedDates.map(d => ({ key: d, label: `Day ${dayIndexMap.get(d) ?? "?"}` })),
+    ...(hasUnscheduledPinned ? [{ key: "__none__", label: "Unscheduled" }] : []),
+  ];
+
+  const mapFilteredItems =
+    mapDay === null ? sorted :
+    mapDay === "__none__" ? sorted.filter(i => i.startTime === null) :
+    sorted.filter(i => toDateKey(i.startTime) === mapDay);
 
   useEffect(() => {
     if (pinnedItems.length < 2 || !MAPBOX_TOKEN) {
@@ -322,6 +350,25 @@ export function PublicTripView({ trip }: { trip: PublicTrip }) {
     () => Object.values(legDistances).reduce((s, v) => s + v, 0),
     [legDistances],
   );
+
+  const filteredRouteSegments = useMemo(() => {
+    if (mapDay === null) return routeSegments;
+    if (mapDay === "__none__") return [];
+    const dayKeys = [...new Set(
+      pinnedItems.map(i => toDateKey(i.startTime)).filter((k): k is string => k !== "")
+    )].sort();
+    const dayIdx = dayKeys.indexOf(mapDay);
+    return dayIdx === -1 ? [] : routeSegments.filter(s => s.dayIndex === dayIdx);
+  }, [mapDay, routeSegments, pinnedItems]);
+
+  const filteredTotalKm = useMemo(() => {
+    if (mapDay === null) return totalKm > 0 ? totalKm : undefined;
+    const visibleIds = new Set(
+      mapFilteredItems.filter(i => i.locationLat !== null && i.locationLng !== null).map(i => i.id)
+    );
+    const km = Object.entries(legDistances).filter(([id]) => visibleIds.has(id)).reduce((s, [, v]) => s + v, 0);
+    return km > 0 ? km : undefined;
+  }, [mapDay, mapFilteredItems, legDistances, totalKm]);
 
   useEffect(() => {
     if (activeDay !== null) return;
@@ -481,13 +528,43 @@ export function PublicTripView({ trip }: { trip: PublicTrip }) {
           </>
         )}
         {tab === "map" && (
-          <PublicMapView
-            items={sorted}
-            routeSegments={routeSegments}
-            totalKm={totalKm > 0 ? totalKm : undefined}
-            legDistances={legDistances}
-            legDurations={legDurations}
-          />
+          <div style={{ flex: 1, position: "relative", display: "flex", flexDirection: "column", minHeight: 0, overflow: "hidden" }}>
+            <PublicMapView
+              items={mapFilteredItems}
+              routeSegments={filteredRouteSegments}
+              totalKm={filteredTotalKm}
+              legDistances={legDistances}
+              legDurations={legDurations}
+            />
+            {showMapFilter && (
+              <div style={{ position: "absolute", top: 8, left: 0, right: 0, zIndex: 10, pointerEvents: "none" }}>
+                <div style={{
+                  pointerEvents: "auto",
+                  display: "flex",
+                  gap: "0.5rem",
+                  padding: "0 1rem",
+                  overflowX: "auto",
+                  WebkitOverflowScrolling: "touch",
+                  scrollbarWidth: "none",
+                  touchAction: "pan-x",
+                } as React.CSSProperties}>
+                  {mapChips.map(chip => (
+                    <button
+                      key={chip.key ?? "all"}
+                      onClick={() => setMapDay(mapDay === chip.key ? null : chip.key)}
+                      className={`flex-shrink-0 px-3.5 py-1.5 rounded-full text-[12px] font-semibold transition-colors shadow-sm ${
+                        mapDay === chip.key
+                          ? "bg-[#E8622A] text-white"
+                          : "bg-white/90 text-[#6B6560]"
+                      }`}
+                    >
+                      {chip.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
         )}
       </div>
     </div>
